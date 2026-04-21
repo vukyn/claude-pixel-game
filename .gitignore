@@ -17,3 +17,10 @@ venv/
 
 # MacOS
 .DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Binaries
+*.exe
