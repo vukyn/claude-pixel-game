@@ -1,0 +1,19 @@
+# Git ignore
+.env
+bin/
+todo
+
+# Claude Code (per-dev)
+.claude/settings.local.json
+
+# Game runtime data (regenerable from migrations)
+data/
+
+# Node
+node_modules/
+
+# Python
+venv/
+
+# MacOS
+.DS_Store
