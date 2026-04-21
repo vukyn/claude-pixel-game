@@ -21,13 +21,28 @@ func TestLoadReadsEnvVars(t *testing.T) {
 	})
 
 	cfg := Load()
-	if cfg.DBPath != "/tmp/x.db" || cfg.SpriteFrameW != 120 || cfg.RenderScale != 3 {
+	if cfg.DBPath != "/tmp/x.db" ||
+		cfg.AssetsDir != "/tmp/assets" ||
+		cfg.SpriteFrameW != 120 ||
+		cfg.SpriteFrameH != 80 ||
+		cfg.WindowW != 1280 ||
+		cfg.WindowH != 720 ||
+		cfg.RenderScale != 3 ||
+		cfg.DebugConfigPath != "/tmp/debug.json" {
 		t.Fatalf("unexpected cfg: %+v", cfg)
 	}
 }
 
 func TestLoadPanicsOnMissingKey(t *testing.T) {
+	original, had := os.LookupEnv("DB_PATH")
 	os.Unsetenv("DB_PATH")
+	t.Cleanup(func() {
+		if had {
+			os.Setenv("DB_PATH", original)
+		} else {
+			os.Unsetenv("DB_PATH")
+		}
+	})
 	defer func() {
 		if recover() == nil {
 			t.Fatal("expected panic when DB_PATH missing")
