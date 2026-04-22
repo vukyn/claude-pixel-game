@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 
 	"claude-pixel/internal/config"
@@ -35,5 +34,3 @@ func LoadLibrary(cfg *config.Config, repo *storage.Repository[AnimationSpec]) (m
 	}
 	return out, nil
 }
-
-var _ = (*ebiten.Image)(nil)
