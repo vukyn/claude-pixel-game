@@ -58,3 +58,23 @@ func (p *Player) ApplyPhysics(w *world.World, dt time.Duration) {
 		p.Grounded = false
 	}
 }
+
+func New(cfg Config) *Player {
+	p := &Player{
+		X:       cfg.StartX,
+		Y:       cfg.StartY,
+		Facing:  1,
+		Physics: cfg.Physics,
+		Anims:   cfg.Anims,
+	}
+	p.FSM = NewFSM(StateIdle)
+	p.FSM.Register(&idleState{})
+	p.FSM.Register(&runState{})
+	p.FSM.Register(&jumpState{})
+	p.FSM.Register(&fallState{})
+	p.FSM.Register(&dashState{})
+	p.FSM.Register(&attackState{})
+	p.FSM.Register(&attack2State{})
+	p.FSM.Start(p)
+	return p
+}
