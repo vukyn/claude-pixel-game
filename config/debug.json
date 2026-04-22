@@ -1,0 +1,9 @@
+{
+  "sections": [
+    { "title": "State",      "fields": ["state", "facing", "grounded", "has_air_dash"] },
+    { "title": "Kinematics", "fields": ["x", "y", "vx", "vy"] },
+    { "title": "Animation",  "fields": ["anim_id", "anim_frame", "anim_elapsed_ms"] },
+    { "title": "Intent",     "fields": ["intent_left", "intent_right", "intent_jump", "intent_dash", "intent_attack", "intent_attack2"] },
+    { "title": "Engine",     "fields": ["fps", "tps"] }
+  ]
+}
