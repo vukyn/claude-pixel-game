@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"strconv"
 	"text/tabwriter"
@@ -73,7 +72,11 @@ func main() {
 					if err := repo.Upsert(ctx, p); err != nil {
 						return err
 					}
-					fmt.Printf("OK: %s = %.4f %s (was %.4f)\n", p.Key, newVal, p.Unit, old)
+					unit := ""
+					if p.Unit != "" {
+						unit = " " + p.Unit
+					}
+					fmt.Printf("OK: %s = %.4f%s (was %.4f)\n", p.Key, newVal, unit, old)
 					return nil
 				},
 			},
@@ -81,6 +84,7 @@ func main() {
 	}
 
 	if err := app.Run(context.Background(), os.Args); err != nil {
-		log.Fatal(err)
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
 }
