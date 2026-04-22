@@ -1,6 +1,6 @@
 # claude-pixel — Claude-facing project guide
 
-Notes for future Claude sessions. Full design:
+Short notes for future Claude sessions. Full design lives in
 `docs/superpowers/specs/2026-04-21-char1-controller-design.md` and
 `docs/superpowers/plans/2026-04-21-char1-controller.md`.
 
@@ -32,11 +32,14 @@ make tune ARGS="list"
 make tune ARGS="set run_speed 320"
 ```
 
-Env from `.env` (template `.env.example`). Missing keys panic at boot. Fresh DB: `rm -rf data/` then `make run` re-runs all migrations.
+Env loaded from `.env` (template in `.env.example`). Missing keys panic
+at boot. Fresh DB: `rm -rf data/` then `make run` re-runs all migrations.
 
 ## Tuning CLI (`cmd/tune`)
 
-Inspect/adjust physics params without editing SQL. Values in `tuning` table. `set` validates vs row `min_value`/`max_value`, rejects unknown keys.
+Use this to inspect or adjust physics parameters without editing SQL
+directly. Values live in the `tuning` table; `set` validates against
+each row's `min_value`/`max_value` and rejects unknown keys.
 
 ### List every parameter
 
@@ -46,7 +49,7 @@ go run ./cmd/tune list
 make tune ARGS="list"
 ```
 
-Output: tabwriter table `KEY VALUE MIN MAX UNIT DESCRIPTION`.
+Output: tabwriter table with `KEY VALUE MIN MAX UNIT DESCRIPTION`.
 
 Current keys (6):
 
@@ -65,17 +68,19 @@ Current keys (6):
 go run ./cmd/tune set <key> <value>
 ```
 
-Exit 0: `OK: <key> = <new> <unit> (was <old>)`.
-Exit 1, one of:
+Exits 0 with `OK: <key> = <new> <unit> (was <old>)` on success.
+Exits 1 with one of:
 - `unknown tuning key "..."` (key not in DB)
 - `value "..." is not a number` (bad parse)
 - `value out of range: X not in [min, max] unit` (validator)
 
-Changes apply next `make run`. No hot reload.
+Tuning changes take effect on next `make run` (no hot reload).
 
 ## Debug overlay
 
-Toggle **F3** in-game. Layout `config/debug.json` — edit, restart. Unknown field keys = boot-time error listing valid keys. Catalog: `internal/debug/fields.go` (19 fields).
+Toggle with **F3** in-game. Layout is `config/debug.json` — edit,
+restart. Unknown field keys cause boot-time error listing all valid
+keys. Source catalog: `internal/debug/fields.go` (19 fields total).
 
 ## Controls
 
@@ -88,15 +93,22 @@ Toggle **F3** in-game. Layout `config/debug.json` — edit, restart. Unknown fie
 | Attack2 | `K` or `C` (edge) |
 | Debug | `F3` (edge) |
 
-Shift alone = no-op. No double-jump. Attacks cancelable by Jump only (grounded).
+Shift alone is a no-op. No double-jump. Attacks cancelable by Jump only
+(grounded).
 
 ## State machine
 
-6 states: `Idle`, `Run`, `Jump`, `Fall`, `Attack`, `Attack2`. See `internal/player/states.go` + mermaid diagram in design spec (section 7). Each state = `struct{}` with value-receiver methods, registered pointerwise in `player.New`.
+6 states: `Idle`, `Run`, `Jump`, `Fall`, `Attack`, `Attack2`. See
+`internal/player/states.go` and the mermaid diagram in the design spec
+(section 7). Each state is a `struct{}` with value-receiver methods
+registered pointerwise in `player.New`.
 
 ## Migrations
 
-`internal/storage/migrations/*.sql` embedded via `//go:embed`, applied in order by `internal/storage/migrations.go`. Tracked in `schema_migrations`. Never edit applied migration — add new numbered file.
+All `internal/storage/migrations/*.sql` embedded via `//go:embed`,
+applied in order by `internal/storage/migrations.go`. Tracked in
+`schema_migrations`. Never edit an already-applied migration — add a
+new numbered file.
 
 ## Tests
 
@@ -104,6 +116,9 @@ Shift alone = no-op. No double-jump. Attacks cancelable by Jump only (grounded).
 go test ./...
 ```
 
-Covers: config loader, Repository CRUD, Animation math, FSM transitions (incl. sprint + attack-cancel-by-jump), tuning validator, debug config unknown-field rejection.
+Covers: config loader, Repository CRUD, Animation math, FSM
+transitions (incl. sprint + attack-cancel-by-jump), tuning validator,
+debug config unknown-field rejection.
 
-Ebiten rendering + sprite slicing verified manually — see T18 checklist in plan doc.
+Ebiten rendering and sprite slicing verified manually — see T18
+checklist in the plan doc.
