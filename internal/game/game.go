@@ -33,7 +33,6 @@ func New(cfg *config.Config, anims map[string]*anim.Animation, physics *player.P
 		Anims:   anims,
 	})
 	p.Grounded = true
-	p.HasAirDash = true
 
 	g := &Game{cfg: cfg, world: w, player: p}
 	g.overlay = debug.NewOverlay(dbgCfg, g)

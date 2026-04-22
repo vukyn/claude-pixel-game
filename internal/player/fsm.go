@@ -13,7 +13,6 @@ const (
 	StateRun     StateID = "run"
 	StateJump    StateID = "jump"
 	StateFall    StateID = "fall"
-	StateDash    StateID = "dash"
 	StateAttack  StateID = "attack"
 	StateAttack2 StateID = "attack2"
 )

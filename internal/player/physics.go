@@ -3,7 +3,6 @@ package player
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"claude-pixel/internal/storage"
 )
@@ -14,8 +13,7 @@ type Physics struct {
 	JumpVelocity float64
 	Gravity      float64
 	MaxFallSpeed float64
-	DashSpeed    float64
-	DashDuration time.Duration
+	SprintSpeed  float64
 }
 
 func LoadPhysics(repo *storage.Repository[TuningParam]) (*Physics, error) {
@@ -51,13 +49,8 @@ func LoadPhysics(repo *storage.Repository[TuningParam]) (*Physics, error) {
 	if ph.MaxFallSpeed, e = pick("max_fall_speed"); e != nil {
 		return nil, e
 	}
-	if ph.DashSpeed, e = pick("dash_speed"); e != nil {
+	if ph.SprintSpeed, e = pick("sprint_speed"); e != nil {
 		return nil, e
 	}
-	dd, e := pick("dash_duration_ms")
-	if e != nil {
-		return nil, e
-	}
-	ph.DashDuration = time.Duration(dd) * time.Millisecond
 	return ph, nil
 }

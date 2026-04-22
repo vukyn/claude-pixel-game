@@ -17,6 +17,17 @@ func moveDir(in input.Intent) int {
 	}
 }
 
+func groundSpeed(p *Player, in input.Intent) float64 {
+	if in.SprintHeld {
+		return p.Physics.SprintSpeed
+	}
+	return p.Physics.RunSpeed
+}
+
+func airSpeed(p *Player, in input.Intent) float64 {
+	return groundSpeed(p, in) * p.Physics.AirControl
+}
+
 type idleState struct{}
 
 func (idleState) ID() StateID     { return StateIdle }
@@ -25,9 +36,6 @@ func (idleState) Exit(p *Player)  {}
 func (idleState) Update(p *Player, in input.Intent, dt time.Duration) StateID {
 	if !p.Grounded {
 		return StateFall
-	}
-	if in.DashPressed {
-		return StateDash
 	}
 	if in.AttackPressed {
 		return StateAttack
@@ -54,13 +62,10 @@ func (runState) Update(p *Player, in input.Intent, dt time.Duration) StateID {
 	if d != 0 {
 		p.Facing = d
 	}
-	p.VX = float64(d) * p.Physics.RunSpeed
+	p.VX = float64(d) * groundSpeed(p, in)
 
 	if !p.Grounded {
 		return StateFall
-	}
-	if in.DashPressed {
-		return StateDash
 	}
 	if in.AttackPressed {
 		return StateAttack
@@ -87,11 +92,8 @@ func (jumpState) Update(p *Player, in input.Intent, dt time.Duration) StateID {
 	if d != 0 {
 		p.Facing = d
 	}
-	p.VX = float64(d) * p.Physics.RunSpeed * p.Physics.AirControl
+	p.VX = float64(d) * airSpeed(p, in)
 
-	if in.DashPressed && p.HasAirDash {
-		return StateDash
-	}
 	if in.AttackPressed {
 		return StateAttack
 	}
@@ -114,11 +116,8 @@ func (fallState) Update(p *Player, in input.Intent, dt time.Duration) StateID {
 	if d != 0 {
 		p.Facing = d
 	}
-	p.VX = float64(d) * p.Physics.RunSpeed * p.Physics.AirControl
+	p.VX = float64(d) * airSpeed(p, in)
 
-	if in.DashPressed && p.HasAirDash {
-		return StateDash
-	}
 	if in.AttackPressed {
 		return StateAttack
 	}
@@ -134,30 +133,6 @@ func (fallState) Update(p *Player, in input.Intent, dt time.Duration) StateID {
 	return StateFall
 }
 
-type dashState struct{}
-
-func (dashState) ID() StateID { return StateDash }
-func (dashState) Enter(p *Player) {
-	p.PlayAnim("dash")
-	p.DashTimer = 0
-	p.VX = 0
-	p.VY = 0
-	if !p.Grounded {
-		p.HasAirDash = false
-	}
-}
-func (dashState) Exit(p *Player) {}
-func (dashState) Update(p *Player, in input.Intent, dt time.Duration) StateID {
-	p.DashTimer += dt
-	if p.DashTimer >= p.Physics.DashDuration {
-		if p.Grounded {
-			return StateIdle
-		}
-		return StateFall
-	}
-	return StateDash
-}
-
 type attackState struct{}
 
 func (attackState) ID() StateID { return StateAttack }
@@ -169,13 +144,10 @@ func (attackState) Enter(p *Player) {
 }
 func (attackState) Exit(p *Player) {}
 func (attackState) Update(p *Player, in input.Intent, dt time.Duration) StateID {
-	if in.DashPressed {
-		return StateDash
-	}
 	if in.JumpPressed && p.Grounded {
 		return StateJump
 	}
-	if p.Current.Done() {
+	if p.Current != nil && p.Current.Done() {
 		if p.Grounded {
 			if moveDir(in) == 0 {
 				return StateIdle
@@ -198,13 +170,10 @@ func (attack2State) Enter(p *Player) {
 }
 func (attack2State) Exit(p *Player) {}
 func (attack2State) Update(p *Player, in input.Intent, dt time.Duration) StateID {
-	if in.DashPressed {
-		return StateDash
-	}
 	if in.JumpPressed && p.Grounded {
 		return StateJump
 	}
-	if p.Current.Done() {
+	if p.Current != nil && p.Current.Done() {
 		if p.Grounded {
 			if moveDir(in) == 0 {
 				return StateIdle

@@ -8,7 +8,7 @@ import (
 type Intent struct {
 	Left, Right    bool
 	JumpPressed    bool
-	DashPressed    bool
+	SprintHeld     bool
 	AttackPressed  bool
 	Attack2Pressed bool
 }
@@ -18,7 +18,7 @@ func Poll() Intent {
 		Left:           ebiten.IsKeyPressed(ebiten.KeyA) || ebiten.IsKeyPressed(ebiten.KeyArrowLeft),
 		Right:          ebiten.IsKeyPressed(ebiten.KeyD) || ebiten.IsKeyPressed(ebiten.KeyArrowRight),
 		JumpPressed:    inpututil.IsKeyJustPressed(ebiten.KeySpace),
-		DashPressed:    inpututil.IsKeyJustPressed(ebiten.KeyShiftLeft) || inpututil.IsKeyJustPressed(ebiten.KeyShiftRight),
+		SprintHeld:     ebiten.IsKeyPressed(ebiten.KeyShiftLeft) || ebiten.IsKeyPressed(ebiten.KeyShiftRight),
 		AttackPressed:  inpututil.IsKeyJustPressed(ebiten.KeyJ) || inpututil.IsKeyJustPressed(ebiten.KeyX),
 		Attack2Pressed: inpututil.IsKeyJustPressed(ebiten.KeyK) || inpututil.IsKeyJustPressed(ebiten.KeyC),
 	}

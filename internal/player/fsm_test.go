@@ -63,7 +63,7 @@ func newTestPlayer(t *testing.T) *Player {
 	}
 	return New(Config{
 		StartX: 0, StartY: 0,
-		Physics: &Physics{RunSpeed: 100, AirControl: 1, JumpVelocity: -100, Gravity: 500, MaxFallSpeed: 500, DashSpeed: 200, DashDuration: 50 * time.Millisecond},
+		Physics: &Physics{RunSpeed: 100, AirControl: 1, JumpVelocity: -100, Gravity: 500, MaxFallSpeed: 500, SprintSpeed: 200},
 		Anims:   anims,
 	})
 }
@@ -98,39 +98,54 @@ func TestIdleToRunToJumpToFallToIdle(t *testing.T) {
 	}
 }
 
-func TestAttackCancelByDash(t *testing.T) {
+func TestAttackCancelByJump(t *testing.T) {
 	p := newTestPlayer(t)
 	p.Grounded = true
 	p.FSM.Handle(p, input.Intent{AttackPressed: true}, 16*time.Millisecond)
 	if p.FSM.CurrentID() != StateAttack {
 		t.Fatalf("expected Attack, got %s", p.FSM.CurrentID())
 	}
-	p.FSM.Handle(p, input.Intent{DashPressed: true}, 16*time.Millisecond)
-	if p.FSM.CurrentID() != StateDash {
-		t.Fatalf("dash cancel failed: %s", p.FSM.CurrentID())
+	p.FSM.Handle(p, input.Intent{JumpPressed: true}, 16*time.Millisecond)
+	if p.FSM.CurrentID() != StateJump {
+		t.Fatalf("jump cancel failed: %s", p.FSM.CurrentID())
 	}
 }
 
-func TestAirDashConsumedOnce(t *testing.T) {
+func TestSprintIncreasesSpeed(t *testing.T) {
 	p := newTestPlayer(t)
-	p.Grounded = false
-	p.HasAirDash = true
-	p.FSM.Handle(p, input.Intent{}, 16*time.Millisecond) // should land at Fall
-	if p.FSM.CurrentID() != StateFall {
-		t.Fatalf("expected Fall, got %s", p.FSM.CurrentID())
+	p.Grounded = true
+
+	// First tick: idle → run (Enter runs, Update does not yet).
+	p.FSM.Handle(p, input.Intent{Right: true}, 16*time.Millisecond)
+	if p.FSM.CurrentID() != StateRun {
+		t.Fatalf("expected Run, got %s", p.FSM.CurrentID())
 	}
-	p.FSM.Handle(p, input.Intent{DashPressed: true}, 16*time.Millisecond)
-	if p.FSM.CurrentID() != StateDash {
-		t.Fatalf("air-dash not triggered: %s", p.FSM.CurrentID())
+
+	// Second tick in Run without sprint: VX = RunSpeed * direction.
+	p.FSM.Handle(p, input.Intent{Right: true}, 16*time.Millisecond)
+	if p.VX != 100 {
+		t.Fatalf("expected RunSpeed 100, got VX=%v", p.VX)
 	}
-	for i := 0; i < 10; i++ {
-		p.FSM.Handle(p, input.Intent{}, 10*time.Millisecond)
+
+	// Third tick with SprintHeld: VX = SprintSpeed * direction.
+	p.FSM.Handle(p, input.Intent{Right: true, SprintHeld: true}, 16*time.Millisecond)
+	if p.FSM.CurrentID() != StateRun {
+		t.Fatalf("expected to stay in Run while sprinting, got %s", p.FSM.CurrentID())
 	}
-	if p.HasAirDash {
-		t.Fatal("HasAirDash should be false after air-dash")
+	if p.VX != 200 {
+		t.Fatalf("expected SprintSpeed 200, got VX=%v", p.VX)
 	}
-	p.FSM.Handle(p, input.Intent{DashPressed: true}, 16*time.Millisecond)
-	if p.FSM.CurrentID() == StateDash {
-		t.Fatal("second air-dash should be refused")
+}
+
+func TestShiftAloneDoesNotMove(t *testing.T) {
+	p := newTestPlayer(t)
+	p.Grounded = true
+
+	p.FSM.Handle(p, input.Intent{SprintHeld: true}, 16*time.Millisecond)
+	if p.FSM.CurrentID() != StateIdle {
+		t.Fatalf("expected Idle with Shift alone, got %s", p.FSM.CurrentID())
+	}
+	if p.VX != 0 {
+		t.Fatalf("expected VX=0 with Shift alone, got %v", p.VX)
 	}
 }
