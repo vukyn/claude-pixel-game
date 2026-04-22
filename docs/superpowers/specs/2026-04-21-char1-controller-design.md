@@ -1,7 +1,9 @@
 # Char1 Controller — Design Spec
 
-**Date:** 2026-04-21
-**Status:** Draft for user review
+**Date:** 2026-04-21 (updated 2026-04-23)
+**Status:** Approved; updated after T16 smoke-test feedback
+
+> **2026-04-23 revision.** The original design had a `Dash` state with an edge-triggered `Shift` burst and an air-dash budget. After playtesting (T16 smoke test) the mechanic was replaced with a **held sprint modifier**: `Shift` held together with `A`/`D` raises VX to `SprintSpeed`; pressing `Shift` alone is a no-op. `StateDash`, `HasAirDash`, `DashTimer`, `DashDuration`, and the dash override in `ApplyPhysics` are all removed. Sections below describe the current (sprint) design; historical migrations 001–004 still seed the original dash rows, and migrations 005/006 rename `dash_speed` → `sprint_speed` and tune it to 420 px/s (≈1.5× `run_speed`). The `_Dash.png` sheet is still loaded from DB but is currently unbound to any state (reserved for a future real-dash ability).
 **Scope:** First playable demo: a single character (`char1`) with 7 animations, a keyboard-driven state machine, gravity + flat ground, tunable physics via SQLite, and a config-driven debug overlay.
 
 ---
@@ -11,7 +13,7 @@
 ### Goals
 - Render `char1` sprite sheets from `assets/sprites/char1/*.png` using [ebiten v2](https://github.com/hajimehoshi/ebiten).
 - Slice each horizontal strip into individual frames using a configurable frame size.
-- Drive the character through a **state machine** over 7 states (Idle, Run, Jump, Fall, Dash, Attack, Attack2) with "responsive fighter" transition rules (attack cancelable by jump/dash, air-dash allowed, no double-jump).
+- Drive the character through a **state machine** over 6 states (Idle, Run, Jump, Fall, Attack, Attack2) with "responsive fighter" transition rules (attack cancelable by jump (grounded), Shift-held sprint modifier, no double-jump).
 - Keyboard controls with both WASD+JKL and Arrows+Space/Shift/X/C accepted.
 - Simple mock world: gray background, gray ground slab, gravity pulling the character down to the ground line.
 - Animation library and physics tuning values live in **SQLite**, loaded at boot.
@@ -37,9 +39,9 @@ All sheets are horizontal strips, frame size **120 × 80 px** (folder is named `
 | Run | 10 | 1.0 s | yes | `_Run.png` |
 | Jump | 3 | 0.5 s | no | `_Jump.png` |
 | Fall | 3 | 0.5 s | no (clamp last frame) | `_Fall.png` |
-| Dash | 2 | 0.5 s | no | `_Dash.png` |
-| Attack | 4 | 1.5 s | no | `_Attack.png` |
-| Attack2 | 6 | 1.5 s | no | `_Attack2.png` |
+| Dash | 2 | 0.5 s | no | `_Dash.png` (loaded but unbound — see 2026-04-23 revision) |
+| Attack | 4 | 0.5 s | no | `_Attack.png` |
+| Attack2 | 6 | 0.75 s | no | `_Attack2.png` |
 
 Frame duration = `Duration / FrameCount` (uniform). Non-loop animations clamp on the final frame when elapsed ≥ duration and signal `Done()`.
 
@@ -253,14 +255,17 @@ CREATE TABLE animations (
 ### Seed (`002_seed_char1_animations.sql`)
 
 ```sql
+-- migration 002 (original seed, immutable)
 INSERT OR IGNORE INTO animations (id, file, frame_count, duration_ms, loop) VALUES
     ('idle',    '_Idle.png',    10, 1000, 1),
     ('run',     '_Run.png',     10, 1000, 1),
     ('jump',    '_Jump.png',     3,  500, 0),
     ('fall',    '_Fall.png',     3,  500, 0),
-    ('dash',    '_Dash.png',     2,  500, 0),
+    ('dash',    '_Dash.png',     2,  500, 0),   -- loaded but currently unbound
     ('attack',  '_Attack.png',   4, 1500, 0),
     ('attack2', '_Attack2.png',  6, 1500, 0);
+
+-- migration 005 (tuning amendment): attack=500ms, attack2=750ms.
 ```
 
 ### Types
@@ -337,59 +342,49 @@ stateDiagram-v2
 
     Idle --> Run: move
     Idle --> Jump: jump
-    Idle --> Dash: dash
     Idle --> Attack: attack
     Idle --> Attack2: attack2
     Idle --> Fall: off-edge
 
     Run --> Idle: no move
     Run --> Jump: jump
-    Run --> Dash: dash
     Run --> Attack: attack
     Run --> Attack2: attack2
     Run --> Fall: off-edge
 
     Jump --> Fall: vy >= 0
-    Jump --> Dash: air-dash
     Jump --> Attack: air-attack
     Jump --> Attack2: air-attack2
 
     Fall --> Idle: grounded, no move
     Fall --> Run: grounded, move
-    Fall --> Dash: air-dash
     Fall --> Attack: air-attack
     Fall --> Attack2: air-attack2
-
-    Dash --> Idle: timer done, grounded
-    Dash --> Fall: timer done, airborne
 
     Attack --> Idle: anim done, grounded, no move
     Attack --> Run: anim done, grounded, move
     Attack --> Fall: anim done, airborne
     Attack --> Jump: cancel (grounded only)
-    Attack --> Dash: cancel
 
     Attack2 --> Idle: anim done, grounded, no move
     Attack2 --> Run: anim done, grounded, move
     Attack2 --> Fall: anim done, airborne
     Attack2 --> Jump: cancel (grounded only)
-    Attack2 --> Dash: cancel
 
     note right of Jump
       Only from grounded. No double-jump.
-      hasAirDash resets on land.
     end note
 
-    note right of Dash
-      Constant vx = Facing * DashSpeed.
-      Gravity disabled during dash.
-      One air-dash per airborne phase.
+    note right of Run
+      Shift held + A/D : VX = SprintSpeed.
+      Shift alone is a no-op.
+      Sprint also applies in Jump/Fall via AirControl.
     end note
 
     note right of Attack
       Attack / Attack2 are SEPARATE keys
       (J/X vs K/C), not a combo chain.
-      Cancelable by Dash (any) or Jump (ground).
+      Cancelable by Jump (ground only).
     end note
 ```
 
@@ -397,20 +392,19 @@ stateDiagram-v2
 
 | State | Animation | VX | Physics | Exit conditions |
 |---|---|---|---|---|
-| Idle | Idle (loop) | 0 | gravity on, stick to ground | move → Run / off-edge → Fall / jump/dash/attack/attack2 |
-| Run | Run (loop) | ±RunSpeed (input sign) | gravity on | no move → Idle / off-edge → Fall / jump/dash/attack/attack2 |
-| Jump | Jump (non-loop) | ±RunSpeed × AirControl | gravity on (after impulse) | vy ≥ 0 → Fall / dash (cancel) / attack (cancel) |
-| Fall | Fall (clamp last frame) | ±RunSpeed × AirControl | gravity on | grounded → Idle/Run / dash / attack |
-| Dash | Dash (non-loop) | Facing × DashSpeed (forced) | gravity OFF | timer ≥ DashDuration → Idle/Fall (based on grounded) |
-| Attack | Attack (non-loop) | 0 on ground; preserved on air | gravity on | anim.Done → Idle/Run/Fall / jump cancel (ground) / dash cancel |
-| Attack2 | Attack2 (non-loop) | same as Attack | gravity on | anim.Done → Idle/Run/Fall / jump cancel (ground) / dash cancel |
+| Idle | Idle (loop) | 0 | gravity on, stick to ground | move → Run / off-edge → Fall / jump/attack/attack2 |
+| Run | Run (loop) | ±(SprintHeld ? SprintSpeed : RunSpeed) | gravity on | no move → Idle / off-edge → Fall / jump/attack/attack2 |
+| Jump | Jump (non-loop) | ±(SprintHeld ? SprintSpeed : RunSpeed) × AirControl | gravity on (after impulse) | vy ≥ 0 → Fall / attack (cancel) |
+| Fall | Fall (clamp last frame) | ±(SprintHeld ? SprintSpeed : RunSpeed) × AirControl | gravity on | grounded → Idle/Run / attack |
+| Attack | Attack (non-loop) | 0 on ground; preserved on air | gravity on | anim.Done → Idle/Run/Fall / jump cancel (ground) |
+| Attack2 | Attack2 (non-loop) | same as Attack | gravity on | anim.Done → Idle/Run/Fall / jump cancel (ground) |
 
 ### Additional invariants
 
 - **No double-jump.** Jump input only consumed when `grounded == true`.
-- **Air-dash:** `hasAirDash bool` flag on `Player`. Set to `true` when grounded. Dash while airborne consumes it; dash is refused while airborne if `hasAirDash == false`.
-- **Facing:** Updated whenever `Left` or `Right` intent is held (last pressed wins). Dash uses the facing at the moment Dash is entered; further input during Dash has no effect on direction.
-- **Attack cancel to Jump on ground only** — in the air there is no meaningful "jump cancel" (character is already airborne); dash cancel remains available in air.
+- **Sprint modifier:** `Shift` is held-state (`IsKeyPressed`), not edge-triggered. While `SprintHeld && moveDir != 0`, horizontal speed becomes `SprintSpeed` instead of `RunSpeed`. Pressing `Shift` without a direction is a no-op — the player stays in Idle (or the current state) and VX stays 0. Sprint is always available (no budget, no cooldown) both on ground and in air (air multiplies by `AirControl`).
+- **Facing:** Updated whenever `Left` or `Right` intent is held (last pressed wins).
+- **Attack cancel to Jump on ground only** — in the air there is no meaningful "jump cancel" (character is already airborne).
 - **Off-edge detection:** `Y >= GroundY` means grounded. If `Grounded == true` and a horizontal step would not land on ground (future-proof: today ground is a full slab, so this never happens; keeping the transition for completeness).
 
 ### FSM implementation
@@ -423,7 +417,6 @@ const (
     StateRun     StateID = "run"
     StateJump    StateID = "jump"
     StateFall    StateID = "fall"
-    StateDash    StateID = "dash"
     StateAttack  StateID = "attack"
     StateAttack2 StateID = "attack2"
 )
@@ -445,22 +438,20 @@ func (f *FSM) CurrentID() StateID
 func (f *FSM) Handle(p *Player, in input.Intent, dt time.Duration)
 ```
 
-Each state is a small struct in `states.go`. Cancel rules are encoded in each state's `Update` (e.g. `attackState.Update` checks `in.DashPressed` and `in.JumpPressed` before defaulting to animation-driven exit).
+Each state is a small struct in `states.go`. Cancel rules are encoded in each state's `Update` (e.g. `attackState.Update` checks `in.JumpPressed` while grounded before defaulting to animation-driven exit). Sprint speed selection is centralized in `groundSpeed` / `airSpeed` helpers that Run/Jump/Fall call when computing VX.
 
 ### `Player`
 
 ```go
 type Player struct {
-    X, Y       float64   // feet position in world space
-    VX, VY     float64
-    Facing     int       // +1 or -1
-    Grounded   bool
-    HasAirDash bool
-    DashTimer  time.Duration   // advanced by dashState.Update; reset on dash Enter
-    FSM        *FSM
-    Physics    *Physics
-    Anims      map[string]*Animation
-    Current    *Animation   // pointer into Anims
+    X, Y     float64   // feet position in world space
+    VX, VY   float64
+    Facing   int       // +1 or -1
+    Grounded bool
+    FSM      *FSM
+    Physics  *Physics
+    Anims    map[string]*Animation
+    Current  *Animation   // pointer into Anims
 }
 
 func (p *Player) PlayAnim(id string)                       // Reset + set Current
@@ -484,18 +475,22 @@ CREATE TABLE tuning (
 );
 ```
 
-### Seed (`004_seed_tuning.sql`)
+### Seed (`004_seed_tuning.sql` + `005_sprint_and_attack_tuning.sql` + `006_tune_sprint_speed.sql`)
+
+Migration 004 is immutable (already applied); 005/006 amend it. The effective state after all migrations run is:
 
 ```sql
-INSERT OR IGNORE INTO tuning (key, value, min_value, max_value, unit, description) VALUES
-    ('run_speed',        280,   50,  1000, 'px/s',  'Horizontal ground movement speed'),
-    ('air_control',      0.8,    0,     1, '',      'Horizontal movement multiplier while airborne'),
-    ('jump_velocity',   -650, -2000,  -100, 'px/s',  'Jump impulse applied on takeoff (negative = upward)'),
-    ('gravity',         2000,  100,  5000, 'px/s^2','Downward acceleration applied each tick'),
-    ('max_fall_speed',   900,  100,  3000, 'px/s',  'Terminal vertical velocity clamp'),
-    ('dash_speed',       700,  100,  2000, 'px/s',  'Horizontal velocity during dash'),
-    ('dash_duration_ms', 500,   50,  2000, 'ms',    'Dash duration');
+-- effective rows in `tuning`
+key               value   min     max    unit      description
+run_speed         280      50    1000   px/s      Horizontal ground movement speed
+air_control       0.8       0       1             Horizontal movement multiplier while airborne
+jump_velocity    -650   -2000    -100   px/s      Jump impulse applied on takeoff (negative = upward)
+gravity          2000     100    5000   px/s^2    Downward acceleration applied each tick
+max_fall_speed    900     100    3000   px/s      Terminal vertical velocity clamp
+sprint_speed      420     100    2000   px/s      Horizontal ground movement speed while Shift held
 ```
+
+Migration 005 also updates `animations.duration_ms` to `attack=500` and `attack2=750` for snappier combat feel, renames `dash_speed` → `sprint_speed`, and deletes the obsolete `dash_duration_ms` row. Migration 006 tunes `sprint_speed` to `420` (≈1.5× `run_speed`).
 
 ### Types
 
@@ -511,19 +506,18 @@ type TuningParam struct {
 func (t TuningParam) GetID() string { return t.Key }
 
 type Physics struct {
-    RunSpeed      float64
-    AirControl    float64
-    JumpVelocity  float64
-    Gravity       float64
-    MaxFallSpeed  float64
-    DashSpeed     float64
-    DashDuration  time.Duration
+    RunSpeed     float64
+    AirControl   float64
+    JumpVelocity float64
+    Gravity      float64
+    MaxFallSpeed float64
+    SprintSpeed  float64
 }
 
 func LoadPhysics(repo *storage.Repository[TuningParam]) (*Physics, error)
 ```
 
-`LoadPhysics` fetches all rows, converts `dash_duration_ms` from REAL to `time.Duration`, and errors if any expected key is missing.
+`LoadPhysics` fetches all rows and errors if any of the six expected keys is missing.
 
 ---
 
@@ -533,11 +527,11 @@ func LoadPhysics(repo *storage.Repository[TuningParam]) (*Physics, error)
 
 ```go
 type Intent struct {
-    Left, Right     bool
-    JumpPressed     bool  // edge (just pressed this tick)
-    DashPressed     bool  // edge
-    AttackPressed   bool  // edge
-    Attack2Pressed  bool  // edge
+    Left, Right    bool  // held
+    JumpPressed    bool  // edge (just pressed this tick)
+    SprintHeld     bool  // held
+    AttackPressed  bool  // edge
+    Attack2Pressed bool  // edge
 }
 
 func Poll() Intent
@@ -547,10 +541,10 @@ func Poll() Intent
 
 | Intent | Keys |
 |---|---|
-| Left | `A`, `ArrowLeft` |
-| Right | `D`, `ArrowRight` |
+| Left | `A`, `ArrowLeft` (held) |
+| Right | `D`, `ArrowRight` (held) |
 | JumpPressed | `Space` (edge) |
-| DashPressed | `ShiftLeft` or `ShiftRight` (edge) |
+| SprintHeld | `ShiftLeft` or `ShiftRight` (held) |
 | AttackPressed | `J` or `X` (edge) |
 | Attack2Pressed | `K` or `C` (edge) |
 
@@ -592,7 +586,6 @@ var Catalog = map[string]Field{
     "state":           {"state",           func(s FieldSource) string { return "State: " + string(s.Player().FSM.CurrentID()) }},
     "facing":          {"facing",          func(s FieldSource) string { return fmt.Sprintf("Facing: %+d", s.Player().Facing) }},
     "grounded":        {"grounded",        func(s FieldSource) string { return fmt.Sprintf("Grounded: %t", s.Player().Grounded) }},
-    "has_air_dash":    {"has_air_dash",    func(s FieldSource) string { return fmt.Sprintf("HasAirDash: %t", s.Player().HasAirDash) }},
     "x":               {"x",               func(s FieldSource) string { return fmt.Sprintf("X: %.2f", s.Player().X) }},
     "y":               {"y",               func(s FieldSource) string { return fmt.Sprintf("Y: %.2f", s.Player().Y) }},
     "vx":              {"vx",              func(s FieldSource) string { return fmt.Sprintf("VX: %.2f", s.Player().VX) }},
@@ -603,7 +596,7 @@ var Catalog = map[string]Field{
     "intent_left":     {"intent_left",     func(s FieldSource) string { return fmt.Sprintf("Left: %t", s.Intent().Left) }},
     "intent_right":    {"intent_right",    func(s FieldSource) string { return fmt.Sprintf("Right: %t", s.Intent().Right) }},
     "intent_jump":     {"intent_jump",     func(s FieldSource) string { return fmt.Sprintf("Jump: %t", s.Intent().JumpPressed) }},
-    "intent_dash":     {"intent_dash",     func(s FieldSource) string { return fmt.Sprintf("Dash: %t", s.Intent().DashPressed) }},
+    "intent_sprint":   {"intent_sprint",   func(s FieldSource) string { return fmt.Sprintf("Sprint: %t", s.Intent().SprintHeld) }},
     "intent_attack":   {"intent_attack",   func(s FieldSource) string { return fmt.Sprintf("Attack: %t", s.Intent().AttackPressed) }},
     "intent_attack2":  {"intent_attack2",  func(s FieldSource) string { return fmt.Sprintf("Attack2: %t", s.Intent().Attack2Pressed) }},
     "fps":             {"fps",             func(s FieldSource) string { return fmt.Sprintf("FPS: %.1f", s.EngineFPS()) }},
@@ -616,10 +609,10 @@ var Catalog = map[string]Field{
 ```json
 {
   "sections": [
-    { "title": "State",      "fields": ["state", "facing", "grounded", "has_air_dash"] },
+    { "title": "State",      "fields": ["state", "facing", "grounded"] },
     { "title": "Kinematics", "fields": ["x", "y", "vx", "vy"] },
     { "title": "Animation",  "fields": ["anim_id", "anim_frame", "anim_elapsed_ms"] },
-    { "title": "Intent",     "fields": ["intent_left", "intent_right", "intent_jump", "intent_dash", "intent_attack", "intent_attack2"] },
+    { "title": "Intent",     "fields": ["intent_left", "intent_right", "intent_jump", "intent_sprint", "intent_attack", "intent_attack2"] },
     { "title": "Engine",     "fields": ["fps", "tps"] }
   ]
 }

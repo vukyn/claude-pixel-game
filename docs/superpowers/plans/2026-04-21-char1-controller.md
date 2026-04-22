@@ -78,16 +78,17 @@ Module name: `claude-pixel` (already set in `go.mod`). All imports use `claude-p
 
 - [ ] **Step 1: Add dependencies**
 
-Run:
+Run (each `go get` writes the dep into `go.mod`):
 ```bash
 go get github.com/hajimehoshi/ebiten/v2@latest
 go get github.com/joho/godotenv@latest
 go get modernc.org/sqlite@latest
 go get github.com/urfave/cli/v3@latest
-go mod tidy
 ```
 
-Expected: `go.mod` now lists these four modules.
+Expected: `go.mod` now lists these four modules as `require` entries.
+
+**Do NOT run `go mod tidy` in this task.** `tidy` removes any dep that has no importer, and the first real importer does not appear until Task 2 (`config/config.go` imports `godotenv`). Each subsequent task that adds an importer can safely run `go mod tidy` for its own package; we defer a repo-wide tidy until Task 18 (post-verification).
 
 - [ ] **Step 2: Create `.env`**
 
