@@ -75,3 +75,18 @@ func (a *Animation) CurrentFrame() *ebiten.Image {
 	}
 	return a.frames[a.FrameIndex()]
 }
+
+// FrameAt returns the frame at explicit index (0-based), for non-time-driven
+// animations (e.g. progress bars). Clamps to range; returns nil if no frames.
+func (a *Animation) FrameAt(i int) *ebiten.Image {
+	if len(a.frames) == 0 {
+		return nil
+	}
+	if i < 0 {
+		i = 0
+	}
+	if i >= len(a.frames) {
+		i = len(a.frames) - 1
+	}
+	return a.frames[i]
+}
