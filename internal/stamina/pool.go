@@ -35,4 +35,7 @@ func (p *Pool) Fraction() float64 {
 	return p.Cur / p.Max
 }
 
-func (p *Pool) CanSprint() bool { return p.Cur > 0 }
+// MinSprintFraction is the stamina threshold below which sprint is blocked.
+const MinSprintFraction = 0.1
+
+func (p *Pool) CanSprint() bool { return p.Cur >= p.Max*MinSprintFraction }

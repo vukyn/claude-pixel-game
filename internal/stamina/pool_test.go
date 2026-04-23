@@ -70,3 +70,19 @@ func TestPoolNoChangeWhenNotSprintingAndFull(t *testing.T) {
 		t.Fatalf("want Cur=100, got %f", p.Cur)
 	}
 }
+
+func TestCanSprintBlockedBelow10Percent(t *testing.T) {
+	p := NewPool(100, 20, 20)
+	p.Cur = 9.9
+	if p.CanSprint() {
+		t.Fatal("want CanSprint false at 9.9% (below 10%)")
+	}
+	p.Cur = 10
+	if !p.CanSprint() {
+		t.Fatal("want CanSprint true at exactly 10%")
+	}
+	p.Cur = 10.1
+	if !p.CanSprint() {
+		t.Fatal("want CanSprint true above 10%")
+	}
+}
