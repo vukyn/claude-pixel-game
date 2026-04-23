@@ -35,7 +35,14 @@ func LoadLibrary(cfg *config.Config, repo *storage.Repository[AnimationSpec]) (m
 			if w != wantW || h != wantH {
 				return nil, fmt.Errorf("sheet %s (grid): got %dx%d, want %dx%d", spec.Path, w, h, wantW, wantH)
 			}
-			frames = SliceGrid(img, spec.FrameW, spec.FrameH, spec.GridCols, spec.GridRows, spec.PickRow, spec.FrameCount)
+			if spec.PickCol >= 0 && spec.PickRow != 0 {
+				return nil, fmt.Errorf("animation %s: pick_row and pick_col are mutually exclusive (set pick_row=0 when using pick_col)", spec.ID)
+			}
+			if spec.PickCol >= 0 {
+				frames = SliceColumn(img, spec.FrameW, spec.FrameH, spec.PickCol, spec.FrameCount)
+			} else {
+				frames = SliceGrid(img, spec.FrameW, spec.FrameH, spec.GridCols, spec.GridRows, spec.PickRow, spec.FrameCount)
+			}
 		} else {
 			wantW := spec.FrameW * spec.FrameCount
 			if w != wantW || h != spec.FrameH {

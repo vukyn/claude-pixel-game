@@ -34,3 +34,15 @@ func SliceGrid(img *ebiten.Image, frameW, frameH, cols, rows, pickRow, count int
 	}
 	return frames
 }
+
+// SliceColumn slices a 2D grid sheet (cols x rows of frameW x frameH), picking
+// `count` consecutive frames from column `pickCol` (0-indexed), top-to-bottom.
+func SliceColumn(img *ebiten.Image, frameW, frameH, pickCol, count int) []*ebiten.Image {
+	frames := make([]*ebiten.Image, count)
+	for i := 0; i < count; i++ {
+		x0 := pickCol * frameW
+		y0 := i * frameH
+		frames[i] = img.SubImage(image.Rect(x0, y0, x0+frameW, y0+frameH)).(*ebiten.Image)
+	}
+	return frames
+}

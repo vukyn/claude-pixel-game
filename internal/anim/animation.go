@@ -20,6 +20,7 @@ type AnimationSpec struct {
 	GridCols   int
 	GridRows   int
 	PickRow    int
+	PickCol    int // -1 = row mode (use PickRow). >=0 = column-strip mode.
 }
 
 func (a AnimationSpec) GetID() string { return a.ID }
