@@ -309,9 +309,10 @@ func (g *Game) drawEnemy(screen *ebiten.Image, e *enemy.Enemy) {
 	if e.Current == nil || e.Current.CurrentFrame() == nil {
 		return
 	}
-	// Orc sprite has ~20px transparent padding at frame bottom; anchor the
-	// frame such that the visible feet (not the frame bottom) align with e.Y.
-	const orcVisibleFootPadding = 20
+	// Orc sprite has ~45px transparent padding at frame bottom (visible char
+	// occupies roughly middle of 100px frame); anchor the frame so visible
+	// feet, not frame bottom, align with e.Y.
+	const orcVisibleFootPadding = 45
 	op := &ebiten.DrawImageOptions{}
 	op.GeoM.Translate(-100.0/2, -100.0+orcVisibleFootPadding)
 	if e.Facing < 0 {
