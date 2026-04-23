@@ -1,12 +1,10 @@
 package enemy
 
 import (
-	"context"
 	"fmt"
 
 	"claude-pixel/internal/anim"
 	"claude-pixel/internal/combat"
-	"claude-pixel/internal/storage"
 )
 
 // OrcAnims extracts the 6 orc anims from a loaded library.
@@ -23,14 +21,10 @@ func OrcAnims(lib map[string]*anim.Animation) (map[string]*anim.Animation, error
 	return out, nil
 }
 
-// OrcBoxes loads orc hitboxes keyed by kind ("body","attack","attack2").
-func OrcBoxes(repo *storage.Repository[combat.HitboxSpec]) (map[string]combat.Box, error) {
-	all, err := repo.List(context.Background())
-	if err != nil {
-		return nil, err
-	}
+// OrcBoxes filters HitboxSpec list down to orc boxes keyed by kind ("body","attack","attack2").
+func OrcBoxes(specs []combat.HitboxSpec) (map[string]combat.Box, error) {
 	out := make(map[string]combat.Box, 3)
-	for _, s := range all {
+	for _, s := range specs {
 		if s.Owner != "orc" {
 			continue
 		}
