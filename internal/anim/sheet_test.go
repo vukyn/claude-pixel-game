@@ -1,26 +1,25 @@
 package anim
 
-import (
-	"testing"
+import "testing"
 
-	"github.com/hajimehoshi/ebiten/v2"
-)
-
-func TestSliceGridPicksCorrectRow(t *testing.T) {
-	// 4 cols x 6 rows of 16x16 => 64x96
-	img := ebiten.NewImage(64, 96)
-	frames := SliceGrid(img, 16, 16, 4, 6, 3, 4)
-	if len(frames) != 4 {
-		t.Fatalf("want 4 frames, got %d", len(frames))
+func TestGridFrameRectPicksCorrectRow(t *testing.T) {
+	// 4 cols x 6 rows of 16x16, pickRow=3 (0-indexed), 4 frames.
+	frameW, frameH, cols, pickRow := 16, 16, 4, 3
+	for i := 0; i < 4; i++ {
+		r := gridFrameRect(frameW, frameH, cols, pickRow, i)
+		if r.Dx() != 16 || r.Dy() != 16 {
+			t.Errorf("frame %d: want 16x16, got %dx%d", i, r.Dx(), r.Dy())
+		}
+		if r.Min.X != i*16 || r.Min.Y != 48 {
+			t.Errorf("frame %d: want origin (%d,48), got (%d,%d)", i, i*16, r.Min.X, r.Min.Y)
+		}
 	}
-	for i, f := range frames {
-		b := f.Bounds()
-		if b.Dx() != 16 || b.Dy() != 16 {
-			t.Errorf("frame %d: want 16x16, got %dx%d", i, b.Dx(), b.Dy())
-		}
-		// pick_row=3 (0-indexed) -> y origin 48; col i -> x origin i*16
-		if b.Min.X != i*16 || b.Min.Y != 48 {
-			t.Errorf("frame %d: want origin (%d,48), got (%d,%d)", i, i*16, b.Min.X, b.Min.Y)
-		}
+}
+
+func TestGridFrameRectWrapsColumns(t *testing.T) {
+	// With cols=4, frame index 5 should wrap to col=1.
+	r := gridFrameRect(10, 10, 4, 0, 5)
+	if r.Min.X != 10 {
+		t.Errorf("frame 5 col wrap: want x=10, got %d", r.Min.X)
 	}
 }
