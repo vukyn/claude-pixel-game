@@ -11,6 +11,7 @@ type Intent struct {
 	SprintHeld     bool
 	AttackPressed  bool
 	Attack2Pressed bool
+	PauseEdge      bool
 }
 
 func Poll() Intent {
@@ -21,5 +22,6 @@ func Poll() Intent {
 		SprintHeld:     ebiten.IsKeyPressed(ebiten.KeyShiftLeft) || ebiten.IsKeyPressed(ebiten.KeyShiftRight),
 		AttackPressed:  inpututil.IsKeyJustPressed(ebiten.KeyJ) || inpututil.IsKeyJustPressed(ebiten.KeyX),
 		Attack2Pressed: inpututil.IsKeyJustPressed(ebiten.KeyK) || inpututil.IsKeyJustPressed(ebiten.KeyC),
+		PauseEdge:      inpututil.IsKeyJustPressed(ebiten.KeyEscape),
 	}
 }
