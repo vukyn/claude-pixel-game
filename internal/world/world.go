@@ -13,3 +13,13 @@ func New(cfg *config.Config, gravity float64) *World {
 		GroundY: float64(cfg.WindowH) - 120,
 	}
 }
+
+func Clamp(x, min, max float64) float64 {
+	if x < min {
+		return min
+	}
+	if x > max {
+		return max
+	}
+	return x
+}
