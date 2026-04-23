@@ -19,57 +19,77 @@ import (
 	"claude-pixel/internal/hud"
 	"claude-pixel/internal/input"
 	"claude-pixel/internal/player"
+	"claude-pixel/internal/score"
 	"claude-pixel/internal/spawner"
+	"claude-pixel/internal/stamina"
 	"claude-pixel/internal/world"
 )
 
-type GameState int
+type Mode int
 
 const (
-	Playing GameState = iota
-	GameOverState
+	ModePlaying Mode = iota
+	ModePaused
+	ModeGameOver
 )
 
 type Deps struct {
-	Cfg          *config.Config
-	Anims        map[string]*anim.Animation
-	Physics      *player.Physics
-	DebugCfg     *debug.Config
-	SoldierBoxes map[string]combat.Box
-	CombatTuning *combat.Tuning
-	EnemyKinds   []*enemy.Kind
-	SpawnTuning  *enemy.SpawnTuning
-	HeartAnim    *anim.Animation
-	HUDFace      *text.GoTextFace
-	OverTitle    *text.GoTextFace
-	OverSubtitle *text.GoTextFace
+	Cfg           *config.Config
+	Anims         map[string]*anim.Animation
+	Physics       *player.Physics
+	StaminaTuning *player.StaminaTuning
+	DebugCfg      *debug.Config
+	SoldierBoxes  map[string]combat.Box
+	CombatTuning  *combat.Tuning
+	EnemyKinds    []*enemy.Kind
+	SpawnTuning   *enemy.SpawnTuning
+	HeartAnim     *anim.Animation
+	StaminaAnim   *anim.Animation
+	HUDFace       *text.GoTextFace
+	OverTitle     *text.GoTextFace
+	OverSubtitle  *text.GoTextFace
+	Layout        hud.Layout
 }
 
 type Game struct {
-	cfg          *config.Config
-	world        *world.World
-	player       *player.Player
-	enemies      []*enemy.Enemy
-	spawner      *spawner.Spawner
-	overlay      *debug.Overlay
-	hud          *hud.HUD
-	gameOver     *hud.GameOver
-	state        GameState
-	hitboxDebug  bool
-	lastIntent   input.Intent
-	combatTuning *combat.Tuning
-	kinds        []*enemy.Kind
-	physics      *player.Physics
-	rng          *rand.Rand
+	cfg               *config.Config
+	world             *world.World
+	player            *player.Player
+	enemies           []*enemy.Enemy
+	spawner           *spawner.Spawner
+	overlay           *debug.Overlay
+	hud               *hud.HUD
+	gameOver          *hud.GameOver
+	pause             *hud.Pause
+	mode              Mode
+	hitboxDebug       bool
+	lastIntent        input.Intent
+	combatTuning      *combat.Tuning
+	kinds             []*enemy.Kind
+	physics           *player.Physics
+	staminaTuning     *player.StaminaTuning
+	rng               *rand.Rand
+	score             *score.Counter
+	swallowNextIntent bool
 }
 
 type livesProvider struct{ p *player.Player }
 
 func (l livesProvider) Lives() int { return l.p.Lives }
 
+type staminaProvider struct{ pool *stamina.Pool }
+
+func (s staminaProvider) StaminaFraction() float64 { return s.pool.Fraction() }
+
+type scoreProvider struct{ c *score.Counter }
+
+func (s scoreProvider) Score() int { return s.c.Total() }
+
 func New(d Deps) *Game {
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 	w := world.New(d.Cfg, d.Physics.Gravity)
+
+	pool := stamina.NewPool(d.StaminaTuning.Max, d.StaminaTuning.DrainPerSec, d.StaminaTuning.RegenPerSec)
 
 	p := player.New(player.Config{
 		StartX:     float64(d.Cfg.WindowW) / 2,
@@ -78,18 +98,23 @@ func New(d Deps) *Game {
 		Anims:      d.Anims,
 		Boxes:      d.SoldierBoxes,
 		StartLives: d.CombatTuning.SoldierMaxLives,
+		Stamina:    pool,
 	})
 	p.Grounded = true
 
+	sc := &score.Counter{}
+
 	g := &Game{
-		cfg:          d.Cfg,
-		world:        w,
-		player:       p,
-		combatTuning: d.CombatTuning,
-		kinds:        d.EnemyKinds,
-		physics:      d.Physics,
-		rng:          rng,
-		state:        Playing,
+		cfg:           d.Cfg,
+		world:         w,
+		player:        p,
+		combatTuning:  d.CombatTuning,
+		kinds:         d.EnemyKinds,
+		physics:       d.Physics,
+		staminaTuning: d.StaminaTuning,
+		rng:           rng,
+		mode:          ModePlaying,
+		score:         sc,
 	}
 	g.overlay = debug.NewOverlay(d.DebugCfg, g)
 
@@ -128,8 +153,13 @@ func New(d Deps) *Game {
 		Kinds:        kindFactories,
 	})
 
-	g.hud = hud.NewHUD(d.HeartAnim, d.HUDFace, livesProvider{p}, d.Cfg.WindowW, 3)
+	g.hud = hud.NewHUD(
+		d.HeartAnim, d.StaminaAnim, d.HUDFace,
+		livesProvider{p}, staminaProvider{pool}, scoreProvider{sc},
+		d.Layout, d.Cfg.WindowW, d.Cfg.WindowH,
+	)
 	g.gameOver = hud.NewGameOver(d.OverTitle, d.OverSubtitle, d.Cfg.WindowW, d.Cfg.WindowH)
+	g.pause = hud.NewPause(d.OverTitle, d.OverSubtitle, d.Cfg.WindowW, d.Cfg.WindowH)
 
 	return g
 }
@@ -151,15 +181,39 @@ func (g *Game) Update() error {
 		g.hitboxDebug = !g.hitboxDebug
 	}
 
-	if g.state == GameOverState {
+	if g.mode == ModeGameOver {
 		if inpututil.IsKeyJustPressed(ebiten.KeyR) {
 			g.reset()
 		}
 		return nil
 	}
 
-	g.lastIntent = input.Poll()
+	if g.mode == ModePaused {
+		if len(inpututil.AppendJustPressedKeys(nil)) > 0 {
+			g.mode = ModePlaying
+			g.swallowNextIntent = true
+		}
+		return nil
+	}
+
+	intent := input.Poll()
+	if intent.PauseEdge {
+		g.mode = ModePaused
+		return nil
+	}
+	if g.swallowNextIntent {
+		intent.JumpPressed = false
+		intent.AttackPressed = false
+		intent.Attack2Pressed = false
+		intent.PauseEdge = false
+		g.swallowNextIntent = false
+	}
+	g.lastIntent = intent
 	dt := time.Second / 60
+
+	if g.player.Stamina != nil {
+		g.player.Stamina.Update(dt, g.player.IsSprinting(intent))
+	}
 
 	g.player.FSM.Handle(g.player, g.lastIntent, dt)
 	for _, e := range g.enemies {
@@ -171,8 +225,6 @@ func (g *Game) Update() error {
 		e.ApplyPhysics(g.world, dt)
 	}
 
-	// Boundary: clamp by body hitbox half-width (post-scale) so sprite transparency
-	// doesn't eat into usable play area.
 	soldierBodyHalfW := float64(g.player.Boxes["body"].W) / 2
 	g.player.X = world.Clamp(g.player.X, soldierBodyHalfW, float64(g.cfg.WindowW)-soldierBodyHalfW)
 
@@ -210,14 +262,16 @@ func (g *Game) Update() error {
 
 	alive := g.enemies[:0]
 	for _, e := range g.enemies {
-		if !e.Dead {
-			alive = append(alive, e)
+		if e.Dead {
+			g.score.Add(e.Kind.Tuning.Points)
+			continue
 		}
+		alive = append(alive, e)
 	}
 	g.enemies = alive
 
 	if g.player.FSM.CurrentID() == player.StateDeath && g.player.Current != nil && g.player.Current.Done() {
-		g.state = GameOverState
+		g.mode = ModeGameOver
 	}
 
 	return nil
@@ -252,6 +306,8 @@ func (g *Game) reset() {
 	oldBoxes := g.player.Boxes
 	g.enemies = nil
 	g.spawner.Reset()
+
+	pool := stamina.NewPool(g.staminaTuning.Max, g.staminaTuning.DrainPerSec, g.staminaTuning.RegenPerSec)
 	g.player = player.New(player.Config{
 		StartX:     float64(g.cfg.WindowW) / 2,
 		StartY:     g.world.GroundY,
@@ -259,10 +315,15 @@ func (g *Game) reset() {
 		Anims:      oldAnims,
 		Boxes:      oldBoxes,
 		StartLives: g.combatTuning.SoldierMaxLives,
+		Stamina:    pool,
 	})
 	g.player.Grounded = true
-	g.hud = hud.NewHUD(g.hud.Heart, g.hud.Face, livesProvider{g.player}, g.cfg.WindowW, g.hud.Scale)
-	g.state = Playing
+
+	g.score.Reset()
+
+	g.hud.Lives = livesProvider{g.player}
+	g.hud.Stamina = staminaProvider{pool}
+	g.mode = ModePlaying
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
@@ -290,7 +351,10 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	g.overlay.Draw(screen)
 
-	if g.state == GameOverState {
+	if g.mode == ModePaused {
+		g.pause.Draw(screen)
+	}
+	if g.mode == ModeGameOver {
 		g.gameOver.Draw(screen)
 	}
 }
