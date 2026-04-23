@@ -11,6 +11,7 @@ import (
 
 	"claude-pixel/internal/combat"
 	"claude-pixel/internal/config"
+	"claude-pixel/internal/hud"
 	"claude-pixel/internal/player"
 	"claude-pixel/internal/storage"
 )
@@ -23,6 +24,7 @@ func main() {
 	tuneRepo := storage.NewRepository[player.TuningParam](db, player.TuningMapper{})
 	hbRepo := storage.NewRepository[combat.HitboxSpec](db, combat.HitboxMapper{})
 	mvRepo := storage.NewRepository[combat.AttackMotionSpec](db, combat.AttackMotionMapper{})
+	hudRepo := storage.NewRepository[hud.LayoutRow](db, hud.LayoutMapper{})
 
 	app := &cli.Command{
 		Name:  "claude-pixel-tune",
@@ -32,6 +34,7 @@ func main() {
 			tuningSetCmd(tuneRepo),
 			hitboxesCmd(hbRepo),
 			motionsCmd(mvRepo),
+			hudCmd(hudRepo),
 		},
 	}
 
@@ -451,6 +454,137 @@ func applyMotionField(m *combat.AttackMotionSpec, field, raw string) error {
 		m.FrameEnd = n
 	default:
 		return fmt.Errorf("unknown field %q (valid: owner, kind, vx, frame_start, frame_end)", field)
+	}
+	return nil
+}
+
+func hudCmd(repo *storage.Repository[hud.LayoutRow]) *cli.Command {
+	return &cli.Command{
+		Name:  "hud",
+		Usage: "CRUD operations on the hud_layout table",
+		Commands: []*cli.Command{
+			{
+				Name:  "list",
+				Usage: "List every hud_layout row",
+				Action: func(ctx context.Context, c *cli.Command) error {
+					rows, err := repo.List(ctx)
+					if err != nil {
+						return err
+					}
+					w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+					fmt.Fprintln(w, "KEY\tX\tY\tW\tH\tANCHOR\tSCALE")
+					for _, r := range rows {
+						fmt.Fprintf(w, "%s\t%d\t%d\t%d\t%d\t%s\t%.2f\n",
+							r.Key, r.X, r.Y, r.W, r.H, r.AnchorS, r.Scale)
+					}
+					return w.Flush()
+				},
+			},
+			{
+				Name:      "get",
+				Usage:     "Show one hud_layout row",
+				ArgsUsage: "<key>",
+				Action: func(ctx context.Context, c *cli.Command) error {
+					if c.Args().Len() != 1 {
+						return fmt.Errorf("usage: tune hud get <key>")
+					}
+					key := c.Args().Get(0)
+					r, err := repo.Get(ctx, key)
+					if err != nil {
+						return fmt.Errorf("unknown hud layout key %q", key)
+					}
+					fmt.Printf("key=%s x=%d y=%d w=%d h=%d anchor=%s scale=%.2f\n",
+						r.Key, r.X, r.Y, r.W, r.H, r.AnchorS, r.Scale)
+					return nil
+				},
+			},
+			{
+				Name:        "set",
+				Usage:       "Update one field of a hud_layout row",
+				ArgsUsage:   "<key> <field> <value>",
+				Description: "Valid fields: x, y, w, h, anchor, scale",
+				Action: func(ctx context.Context, c *cli.Command) error {
+					if c.Args().Len() != 3 {
+						return fmt.Errorf("usage: tune hud set <key> <field> <value>")
+					}
+					key := c.Args().Get(0)
+					field := c.Args().Get(1)
+					raw := c.Args().Get(2)
+
+					r, err := repo.Get(ctx, key)
+					if err != nil {
+						return fmt.Errorf("unknown hud layout key %q", key)
+					}
+					before := formatHUDRow(r)
+					if err := applyHUDField(&r, field, raw); err != nil {
+						return err
+					}
+					if err := repo.Upsert(ctx, r); err != nil {
+						return err
+					}
+					fmt.Printf("OK: %s.%s updated\n  was: %s\n  now: %s\n", key, field, before, formatHUDRow(r))
+					return nil
+				},
+			},
+		},
+	}
+}
+
+func formatHUDRow(r hud.LayoutRow) string {
+	return fmt.Sprintf("x=%d y=%d w=%d h=%d anchor=%s scale=%.2f",
+		r.X, r.Y, r.W, r.H, r.AnchorS, r.Scale)
+}
+
+func applyHUDField(r *hud.LayoutRow, field, raw string) error {
+	asInt := func() (int, error) {
+		n, err := strconv.Atoi(raw)
+		if err != nil {
+			return 0, fmt.Errorf("value %q is not an integer", raw)
+		}
+		return n, nil
+	}
+	switch field {
+	case "x":
+		n, err := asInt()
+		if err != nil {
+			return err
+		}
+		r.X = n
+	case "y":
+		n, err := asInt()
+		if err != nil {
+			return err
+		}
+		r.Y = n
+	case "w":
+		n, err := asInt()
+		if err != nil {
+			return err
+		}
+		r.W = n
+	case "h":
+		n, err := asInt()
+		if err != nil {
+			return err
+		}
+		r.H = n
+	case "anchor":
+		valid := map[string]bool{"top_left": true, "top_right": true, "bottom_left": true, "bottom_right": true}
+		if !valid[raw] {
+			return fmt.Errorf("invalid anchor %q (valid: top_left, top_right, bottom_left, bottom_right)", raw)
+		}
+		r.AnchorS = raw
+	case "scale":
+		f, err := strconv.ParseFloat(raw, 64)
+		if err != nil {
+			return fmt.Errorf("value %q is not a number", raw)
+		}
+		if f <= 0 {
+			return fmt.Errorf("scale must be > 0 (got %f)", f)
+		}
+		r.Scale = f
+	default:
+		return fmt.Errorf("unknown field %q (valid: x, y, w, h, anchor, scale)", field)
 	}
 	return nil
 }
