@@ -294,8 +294,9 @@ func (g *Game) drawPlayer(screen *ebiten.Image) {
 	if g.player.Current == nil || g.player.Current.CurrentFrame() == nil {
 		return
 	}
+	pad := g.combatTuning.SoldierFootPadding
 	op := &ebiten.DrawImageOptions{}
-	op.GeoM.Translate(-120.0/2, -80.0)
+	op.GeoM.Translate(-120.0/2, -80.0+float64(pad))
 	if g.player.Facing < 0 {
 		op.GeoM.Scale(-1, 1)
 	}
@@ -309,12 +310,9 @@ func (g *Game) drawEnemy(screen *ebiten.Image, e *enemy.Enemy) {
 	if e.Current == nil || e.Current.CurrentFrame() == nil {
 		return
 	}
-	// Orc sprite has ~45px transparent padding at frame bottom (visible char
-	// occupies roughly middle of 100px frame); anchor the frame so visible
-	// feet, not frame bottom, align with e.Y.
-	const orcVisibleFootPadding = 45
+	pad := g.orcTuning.FootPadding
 	op := &ebiten.DrawImageOptions{}
-	op.GeoM.Translate(-100.0/2, -100.0+orcVisibleFootPadding)
+	op.GeoM.Translate(-100.0/2, -100.0+float64(pad))
 	if e.Facing < 0 {
 		op.GeoM.Scale(-1, 1)
 	}

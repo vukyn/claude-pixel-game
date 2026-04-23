@@ -17,6 +17,7 @@ type Tuning struct {
 	SpawnMinS    float64
 	SpawnMaxS    float64
 	MaxAlive     float64
+	FootPadding  int
 }
 
 func LoadTuning(repo *storage.Repository[player.TuningParam]) (*Tuning, error) {
@@ -56,5 +57,10 @@ func LoadTuning(repo *storage.Repository[player.TuningParam]) (*Tuning, error) {
 		}
 		*k.p = v
 	}
+	pad, err := pick("orc_foot_padding")
+	if err != nil {
+		return nil, err
+	}
+	t.FootPadding = int(pad)
 	return t, nil
 }

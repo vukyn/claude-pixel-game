@@ -6,6 +6,7 @@ type Tuning struct {
 	SoldierKnockbackVX float64
 	SoldierKnockbackVY float64
 	SoldierMaxLives    int
+	SoldierFootPadding int
 }
 
 // LoadTuning extracts the combat tuning values from a tuning map.
@@ -30,6 +31,11 @@ func LoadTuning(tuning map[string]float64) (*Tuning, error) {
 		return nil, e
 	}
 	t.SoldierMaxLives = int(maxL)
+	var pad float64
+	if pad, e = get("soldier_foot_padding"); e != nil {
+		return nil, e
+	}
+	t.SoldierFootPadding = int(pad)
 	return t, nil
 }
 
