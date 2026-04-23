@@ -5,6 +5,8 @@ import (
 
 	"claude-pixel/internal/anim"
 	"claude-pixel/internal/combat"
+	"claude-pixel/internal/input"
+	"claude-pixel/internal/stamina"
 	"claude-pixel/internal/world"
 )
 
@@ -23,6 +25,7 @@ type Player struct {
 	Boxes       map[string]combat.Box
 	HitSet      map[combat.Fighter]bool
 	CurrentAnim string
+	Stamina     *stamina.Pool
 }
 
 type Config struct {
@@ -31,6 +34,7 @@ type Config struct {
 	Anims          map[string]*anim.Animation
 	Boxes          map[string]combat.Box
 	StartLives     int
+	Stamina        *stamina.Pool
 }
 
 func (p *Player) PlayAnim(id string) {
@@ -72,6 +76,7 @@ func New(cfg Config) *Player {
 		Boxes:   cfg.Boxes,
 		Lives:   cfg.StartLives,
 		HitSet:  map[combat.Fighter]bool{},
+		Stamina: cfg.Stamina,
 	}
 	p.FSM = NewFSM(StateIdle)
 	p.FSM.Register(&idleState{})
@@ -84,6 +89,23 @@ func New(cfg Config) *Player {
 	p.FSM.Register(&deathState{})
 	p.FSM.Start(p)
 	return p
+}
+
+// IsSprinting reports whether the player is actively sprinting this tick.
+// Used both by states.go (for VX selection) and by external code (stamina drain).
+func (p *Player) IsSprinting(in input.Intent) bool {
+	if !p.Grounded {
+		return false
+	}
+	if p.Stamina == nil || !p.Stamina.CanSprint() {
+		return false
+	}
+	if !in.SprintHeld {
+		return false
+	}
+	// replicate moveDir logic inline
+	moving := (in.Right && !in.Left) || (in.Left && !in.Right)
+	return moving
 }
 
 func (p *Player) OnHit(knockbackVX, knockbackVY, attackerX float64) {

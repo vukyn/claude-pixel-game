@@ -19,7 +19,7 @@ func moveDir(in input.Intent) int {
 }
 
 func groundSpeed(p *Player, in input.Intent) float64 {
-	if in.SprintHeld {
+	if in.SprintHeld && p.Stamina != nil && p.Stamina.CanSprint() {
 		return p.Physics.SprintSpeed
 	}
 	return p.Physics.RunSpeed

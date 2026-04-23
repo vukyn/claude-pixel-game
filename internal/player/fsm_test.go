@@ -7,6 +7,7 @@ import (
 	"claude-pixel/internal/anim"
 	"claude-pixel/internal/combat"
 	"claude-pixel/internal/input"
+	"claude-pixel/internal/stamina"
 )
 
 type countingState struct {
@@ -76,6 +77,7 @@ func newTestPlayer(t *testing.T) *Player {
 		Anims:      anims,
 		Boxes:      boxes,
 		StartLives: 10,
+		Stamina:    stamina.NewPool(100, 20, 20),
 	})
 }
 
@@ -199,5 +201,32 @@ func TestPlayerDeathOnZeroLives(t *testing.T) {
 	p.OnHit(200, -300, p.X+10)
 	if p.FSM.CurrentID() != StateDeath {
 		t.Errorf("want death, got %q", p.FSM.CurrentID())
+	}
+}
+
+func TestRunUsesRunSpeedWhenStaminaEmpty(t *testing.T) {
+	pool := stamina.NewPool(100, 20, 20)
+	pool.Cur = 0
+	p := newTestPlayer(t)
+	p.Stamina = pool
+	p.Grounded = true
+	p.FSM.Transition(p, StateRun)
+	in := input.Intent{Right: true, SprintHeld: true}
+	p.FSM.Handle(p, in, time.Second/60)
+	if p.VX != p.Physics.RunSpeed {
+		t.Fatalf("want VX=RunSpeed=%f when stamina empty, got %f", p.Physics.RunSpeed, p.VX)
+	}
+}
+
+func TestRunUsesSprintSpeedWhenStaminaAvailable(t *testing.T) {
+	pool := stamina.NewPool(100, 20, 20)
+	p := newTestPlayer(t)
+	p.Stamina = pool
+	p.Grounded = true
+	p.FSM.Transition(p, StateRun)
+	in := input.Intent{Right: true, SprintHeld: true}
+	p.FSM.Handle(p, in, time.Second/60)
+	if p.VX != p.Physics.SprintSpeed {
+		t.Fatalf("want VX=SprintSpeed=%f, got %f", p.Physics.SprintSpeed, p.VX)
 	}
 }
