@@ -74,9 +74,9 @@ func overlap(a, b rect) bool {
 
 func attackKindFromAnim(id string) string {
 	switch {
-	case strings.HasSuffix(id, "_attack2"):
+	case id == "attack2" || strings.HasSuffix(id, "_attack2"):
 		return "attack2"
-	case strings.HasSuffix(id, "_attack"):
+	case id == "attack" || strings.HasSuffix(id, "_attack"):
 		return "attack"
 	}
 	return ""

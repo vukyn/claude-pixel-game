@@ -12,7 +12,7 @@ type FieldSource interface {
 	Intent() *input.Intent
 	EngineFPS() float64
 	EngineTPS() float64
-	OrcCount() int
+	EnemyCount() int
 	NextSpawnS() float64
 }
 
@@ -58,7 +58,7 @@ var Catalog = map[string]Field{
 	"intent_attack2": {"intent_attack2", func(s FieldSource) string { return fmt.Sprintf("Attack2: %t", s.Intent().Attack2Pressed) }},
 	"fps":            {"fps", func(s FieldSource) string { return fmt.Sprintf("FPS: %.1f", s.EngineFPS()) }},
 	"tps":            {"tps", func(s FieldSource) string { return fmt.Sprintf("TPS: %.1f", s.EngineTPS()) }},
-	"orc_count":           {"orc_count", func(s FieldSource) string { return fmt.Sprintf("Orcs: %d", s.OrcCount()) }},
+	"enemy_count":         {"enemy_count", func(s FieldSource) string { return fmt.Sprintf("Enemies: %d", s.EnemyCount()) }},
 	"orc_next_spawn_s":    {"orc_next_spawn_s", func(s FieldSource) string { return fmt.Sprintf("NextSpawn: %.2fs", s.NextSpawnS()) }},
 	"player_lives":        {"player_lives", func(s FieldSource) string { return fmt.Sprintf("Lives: %d", s.Player().Lives) }},
 	"player_invulnerable": {"player_invulnerable", func(s FieldSource) string { return fmt.Sprintf("Invul: %t", s.Player().HitFlag) }},

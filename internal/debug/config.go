@@ -13,7 +13,22 @@ type Section struct {
 }
 
 type Config struct {
-	Sections []Section `json:"sections"`
+	Sections      []Section `json:"sections"`
+	SpawnEnemies  []string  `json:"spawn_enemies"`
+}
+
+// AllowSpawn reports whether the given enemy kind name should spawn.
+// Empty list or list containing "all" → allow all kinds.
+func (c *Config) AllowSpawn(name string) bool {
+	if len(c.SpawnEnemies) == 0 {
+		return true
+	}
+	for _, k := range c.SpawnEnemies {
+		if k == "all" || k == name {
+			return true
+		}
+	}
+	return false
 }
 
 func LoadConfig(path string) (*Config, error) {

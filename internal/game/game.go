@@ -37,9 +37,8 @@ type Deps struct {
 	DebugCfg     *debug.Config
 	SoldierBoxes map[string]combat.Box
 	CombatTuning *combat.Tuning
-	OrcAnims     map[string]*anim.Animation
-	OrcBoxes     map[string]combat.Box
-	OrcTuning    *enemy.Tuning
+	EnemyKinds   []*enemy.Kind
+	SpawnTuning  *enemy.SpawnTuning
 	HeartAnim    *anim.Animation
 	HUDFace      *text.GoTextFace
 	OverTitle    *text.GoTextFace
@@ -59,9 +58,7 @@ type Game struct {
 	hitboxDebug  bool
 	lastIntent   input.Intent
 	combatTuning *combat.Tuning
-	orcAnims     map[string]*anim.Animation
-	orcBoxes     map[string]combat.Box
-	orcTuning    *enemy.Tuning
+	kinds        []*enemy.Kind
 	physics      *player.Physics
 	rng          *rand.Rand
 }
@@ -89,38 +86,46 @@ func New(d Deps) *Game {
 		world:        w,
 		player:       p,
 		combatTuning: d.CombatTuning,
-		orcAnims:     d.OrcAnims,
-		orcBoxes:     d.OrcBoxes,
-		orcTuning:    d.OrcTuning,
+		kinds:        d.EnemyKinds,
 		physics:      d.Physics,
 		rng:          rng,
 		state:        Playing,
 	}
 	g.overlay = debug.NewOverlay(d.DebugCfg, g)
 
-	orcBodyHalfW := float64(d.OrcBoxes["body"].W) / 2
-	spawnXMin := orcBodyHalfW
-	spawnXMax := float64(d.Cfg.WindowW) - orcBodyHalfW
-	orcSpriteH := float64(100 * d.Cfg.RenderScale)
+	kindFactories := make([]spawner.KindFactory, 0, len(d.EnemyKinds))
+	for _, k := range d.EnemyKinds {
+		k := k
+		halfW := float64(k.Boxes["body"].W) / 2
+		spriteH := float64(k.FrameH * d.Cfg.RenderScale)
+		kindFactories = append(kindFactories, spawner.KindFactory{
+			Name:   k.Name,
+			Weight: 1,
+			NewEnemy: func(x, _ float64) *enemy.Enemy {
+				if x < halfW {
+					x = halfW
+				}
+				if maxX := float64(d.Cfg.WindowW) - halfW; x > maxX {
+					x = maxX
+				}
+				return enemy.New(enemy.Config{
+					StartX: x, StartY: -spriteH,
+					Physics: d.Physics,
+					Kind:    k,
+					RNG:     rng,
+				})
+			},
+		})
+	}
 
 	g.spawner = spawner.New(spawner.Config{
-		MinIntervalS: d.OrcTuning.SpawnMinS,
-		MaxIntervalS: d.OrcTuning.SpawnMaxS,
-		MaxAlive:     int(d.OrcTuning.MaxAlive),
-		SpawnXMin:    spawnXMin,
-		SpawnXMax:    spawnXMax,
-		SpawnY:       -orcSpriteH,
+		MinIntervalS: d.SpawnTuning.MinS,
+		MaxIntervalS: d.SpawnTuning.MaxS,
+		MaxAlive:     d.SpawnTuning.MaxAlive,
+		SpawnXMin:    0,
+		SpawnXMax:    float64(d.Cfg.WindowW),
 		RNG:          rng,
-		NewEnemy: func(x, y float64) *enemy.Enemy {
-			return enemy.New(enemy.Config{
-				StartX: x, StartY: y,
-				Physics: d.Physics,
-				Tuning:  d.OrcTuning,
-				Anims:   d.OrcAnims,
-				Boxes:   d.OrcBoxes,
-				RNG:     rng,
-			})
-		},
+		Kinds:        kindFactories,
 	})
 
 	g.hud = hud.NewHUD(d.HeartAnim, d.HUDFace, livesProvider{p}, d.Cfg.WindowW, 3)
@@ -133,7 +138,7 @@ func (g *Game) Player() *player.Player { return g.player }
 func (g *Game) Intent() *input.Intent  { return &g.lastIntent }
 func (g *Game) EngineFPS() float64     { return ebiten.ActualFPS() }
 func (g *Game) EngineTPS() float64     { return ebiten.ActualTPS() }
-func (g *Game) OrcCount() int          { return len(g.enemies) }
+func (g *Game) EnemyCount() int        { return len(g.enemies) }
 func (g *Game) NextSpawnS() float64    { return g.spawner.NextSpawnS() }
 
 func (g *Game) Layout(outerW, outerH int) (int, int) { return g.cfg.WindowW, g.cfg.WindowH }
@@ -172,9 +177,9 @@ func (g *Game) Update() error {
 	g.player.X = world.Clamp(g.player.X, soldierBodyHalfW, float64(g.cfg.WindowW)-soldierBodyHalfW)
 
 	for _, e := range g.enemies {
-		orcBodyHalfW := float64(e.Boxes["body"].W) / 2
-		leftLimit := orcBodyHalfW
-		rightLimit := float64(g.cfg.WindowW) - orcBodyHalfW
+		bodyHalfW := float64(e.Kind.Boxes["body"].W) / 2
+		leftLimit := bodyHalfW
+		rightLimit := float64(g.cfg.WindowW) - bodyHalfW
 		clamped := world.Clamp(e.X, leftLimit, rightLimit)
 		if clamped != e.X && e.FSM.CurrentID() == enemy.StateRun {
 			if e.X <= leftLimit {
@@ -310,9 +315,11 @@ func (g *Game) drawEnemy(screen *ebiten.Image, e *enemy.Enemy) {
 	if e.Current == nil || e.Current.CurrentFrame() == nil {
 		return
 	}
-	pad := g.orcTuning.FootPadding
+	pad := e.Kind.Tuning.FootPadding
+	fw := float64(e.Kind.FrameW)
+	fh := float64(e.Kind.FrameH)
 	op := &ebiten.DrawImageOptions{}
-	op.GeoM.Translate(-100.0/2, -100.0+float64(pad))
+	op.GeoM.Translate(-fw/2, -fh+float64(pad))
 	if e.Facing < 0 {
 		op.GeoM.Scale(-1, 1)
 	}
@@ -340,7 +347,7 @@ func (g *Game) drawHitboxes(screen *ebiten.Image) {
 	}
 
 	for _, e := range g.enemies {
-		drawBox(e.X, e.Y, e.Facing, e.Boxes["body"], color.RGBA{0, 0xFF, 0, 0xFF})
+		drawBox(e.X, e.Y, e.Facing, e.Kind.Boxes["body"], color.RGBA{0, 0xFF, 0, 0xFF})
 		for _, h := range e.ActiveHits() {
 			drawBox(e.X, e.Y, e.Facing, h, color.RGBA{0xFF, 0, 0, 0xFF})
 		}

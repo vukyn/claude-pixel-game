@@ -16,8 +16,8 @@ internal/
   config/              # godotenv loader (panics on missing env)
   storage/             # sqlite Open + migrations/*.sql + Repository[T]
   anim/                # AnimationSpec (per-spec frame dims + path + grid), sheet slicer, LoadLibrary
-  combat/              # Box + HitboxSpec mapper, Fighter interface, Resolve, Tuning
-  enemy/               # Enemy + FSM (fall/run/attack/attack2/hurt/death), Tuning, OrcAnims/OrcBoxes
+  combat/              # Box + HitboxSpec mapper, Fighter, Resolve, Tuning, AttackMotionSpec (motion.go)
+  enemy/               # Enemy + Kind (kind.go) with AnimPrefix/FrameW/FrameH/Tuning/Boxes/Anims/Motions; FSM (fall/run/attack/attack2/hurt/death), generic AnimsFor/BoxesFor/MotionsFor (loader.go), LoadTuningFor, LoadSpawnTuning
   spawner/             # timer + interval roll + cap enforcement
   hud/                 # monogram font loader, HUD (heart+lives), GameOver overlay
   input/               # Poll() -> Intent (held + edge keys)
@@ -52,7 +52,7 @@ make tune ARGS="list"
 
 Output: tabwriter table `KEY VALUE MIN MAX UNIT DESCRIPTION`.
 
-Current keys (17):
+Current keys (25):
 
 Physics (6):
 | Key | Unit | Effect |
@@ -64,20 +64,28 @@ Physics (6):
 | `gravity` | px/s² | Downward accel per tick |
 | `max_fall_speed` | px/s | Terminal vertical velocity |
 
-Combat + enemy (11):
+Combat + enemy (19):
 | Key | Unit | Effect |
 |---|---|---|
 | `soldier_max_lives` | — | Starting soldier lives (default 10) |
 | `soldier_knockback_vx` | px/s | Horizontal bounce when hit |
 | `soldier_knockback_vy` | px/s | Upward pop when hit (airborne i-frame) |
+| `soldier_foot_padding` | px | Transparent px at soldier sprite frame bottom |
 | `orc_max_lives` | — | Starting orc lives (default 2) |
 | `orc_run_speed` | px/s | Orc ground speed |
 | `orc_hurt_bounce_vx` | px/s | Horizontal bounce on hurt |
 | `orc_hurt_bounce_vy` | px/s | Upward pop on hurt |
 | `orc_intent_tick_s` | s | Interval for run-vs-attack reroll |
-| `orc_spawn_min_s` | s | Minimum spawn interval |
-| `orc_spawn_max_s` | s | Maximum spawn interval |
-| `orc_max_alive` | — | Concurrent orc cap (default 3) |
+| `orc_foot_padding` | px | Transparent px at orc sprite frame bottom |
+| `slime_max_lives` | — | Starting slime lives (default 2) |
+| `slime_run_speed` | px/s | Slime ground speed |
+| `slime_hurt_bounce_vx` | px/s | Horizontal bounce on hurt |
+| `slime_hurt_bounce_vy` | px/s | Upward pop on hurt |
+| `slime_intent_tick_s` | s | Interval for run-vs-attack reroll |
+| `slime_foot_padding` | px | Transparent px at slime sprite frame bottom |
+| `enemy_spawn_min_s` | s | Minimum enemy spawn interval (all kinds) |
+| `enemy_spawn_max_s` | s | Maximum enemy spawn interval (all kinds) |
+| `enemy_max_alive` | — | Concurrent enemy cap across all kinds (default 3) |
 
 ### Update one parameter
 
@@ -92,6 +100,18 @@ Exit 1, one of:
 - `value out of range: X not in [min, max] unit` (validator)
 
 Changes apply next `make run`. No hot reload.
+
+### Motions (`attack_motions` table)
+
+```bash
+go run ./cmd/tune motions list
+go run ./cmd/tune motions get <id>
+go run ./cmd/tune motions set <id> <field> <value>   # fields: owner, kind, vx, frame_start, frame_end
+go run ./cmd/tune motions add <id> <owner> <kind> <vx> <fs> <fe>
+go run ./cmd/tune motions delete <id>
+```
+
+Mirrors the `hitboxes` subcommand shape. Used to retune slime backstep feel and to add motions for future enemy kinds.
 
 ## Debug overlay
 
@@ -118,15 +138,19 @@ Shift alone = no-op. No double-jump. Attacks cancelable by Jump only (grounded).
 
 **Orc** (6 states): `Fall` (from spawn), `Run`, `Attack`, `Attack2`, `Hurt`, `Death`. Every `orc_intent_tick_s`, Run either stays or 50/50 picks `Attack`/`Attack2`. 2 lives — second hit kills. Hurt anim = i-frame window. `internal/enemy/states.go`.
 
+**Slime** (6 states): identical FSM to orc — `Fall` → `Run` → `Attack`/`Attack2` → `Hurt`/`Death`, using `slime_intent_tick_s`. Attack2 applies a backward VX slide on frames 3–5 (configurable via `attack_motions` table → row `slime_attack2_motion`).
+
 ## Combat + hitboxes
 
-Hitbox table seeded by migration 012. Each fighter has a body box (always-on) and attack/attack2 boxes (frame-windowed). `combat.Resolve(attackers, victims)` returns `HitEvent`s via AABB overlap, respecting facing flip, invulnerability, and per-swing dedup. Soldier attack → orc.OnHit (decrement, bounce or die). Orc attack → player.OnHit (knockback + airborne i-frame until land).
+Hitbox table seeded by migration 012. Each fighter has a body box (always-on) and attack/attack2 boxes (frame-windowed). `combat.Resolve(attackers, victims)` returns `HitEvent`s via AABB overlap, respecting facing flip, invulnerability, and per-swing dedup. Soldier attack → enemy.OnHit (decrement, bounce or die). Enemy attack → player.OnHit (knockback + airborne i-frame until land).
 
 Hitbox dims stored in `hitboxes` table (not in `tuning`). Retune via new migration.
 
+**Attack motions** (`attack_motions` table, migration 019) optionally apply a per-frame-window VX slide during an attack state. VX is signed: positive = forward along facing, negative = backward. Seeded for slime Attack2 only (`slime_attack2_motion`: vx=-60, frames 3–5). Retune via `tune motions set <id> <field> <value>`. Orcs have no motion rows; their attacks keep VX=0.
+
 ## Spawner
 
-`internal/spawner` rolls interval uniformly from `[orc_spawn_min_s, orc_spawn_max_s]`, caps at `orc_max_alive`, spawns at random X above screen (`Y = -sprite_h*renderScale`). Orc enters `fall` → `run` on land.
+`internal/spawner` is multi-kind: rolls interval uniformly from `[enemy_spawn_min_s, enemy_spawn_max_s]`, caps at `enemy_max_alive` across all kinds combined, then weighted-rolls which `Kind` to spawn (currently orc + slime). Spawn position = random X above screen (`Y = -kind.FrameH*renderScale`). Enemy enters `fall` → `run` on land.
 
 ## HUD + font
 

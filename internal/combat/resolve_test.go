@@ -118,6 +118,43 @@ func TestResolveDedupsWithinAttackWindow(t *testing.T) {
 	}
 }
 
+func TestResolveAcceptsUnprefixedAttackAnim(t *testing.T) {
+	// Enemy Kind refactor stores unprefixed state names ("attack"/"attack2") on
+	// CurrentAnim. attackKindFromAnim must match both forms so enemy attacks
+	// still produce hit events.
+	cases := []struct {
+		anim string
+		want string
+	}{
+		{"attack", "attack"},
+		{"attack2", "attack2"},
+		{"orc_attack", "attack"},
+		{"slime_attack2", "attack2"},
+		{"soldier_attack", "attack"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.anim, func(t *testing.T) {
+			att := newFake()
+			att.x, att.y = 100, 100
+			att.anim = tc.anim
+			att.hits = []Box{{OffsetX: 20, OffsetY: -60, W: 60, H: 50, FrameStart: 1, FrameEnd: 2}}
+			att.frame = 2
+
+			vic := newFake()
+			vic.x, vic.y = 140, 100
+			vic.body = Box{OffsetX: -25, OffsetY: -80, W: 50, H: 80, FrameStart: -1, FrameEnd: -1}
+
+			events := Resolve([]Fighter{att}, []Fighter{vic})
+			if len(events) != 1 {
+				t.Fatalf("anim=%q want 1 event, got %d", tc.anim, len(events))
+			}
+			if events[0].AttackKind != tc.want {
+				t.Errorf("anim=%q want AttackKind=%q, got %q", tc.anim, tc.want, events[0].AttackKind)
+			}
+		})
+	}
+}
+
 func TestResolveFlipsBoxForFacingMinus1(t *testing.T) {
 	att := newFake()
 	att.x, att.y = 100, 100

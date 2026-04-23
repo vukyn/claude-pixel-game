@@ -26,6 +26,7 @@ func main() {
 	animRepo := storage.NewRepository[anim.AnimationSpec](db, anim.SpecMapper{})
 	tuneRepo := storage.NewRepository[player.TuningParam](db, player.TuningMapper{})
 	hitboxRepo := storage.NewRepository[combat.HitboxSpec](db, combat.HitboxMapper{})
+	motionRepo := storage.NewRepository[combat.AttackMotionSpec](db, combat.AttackMotionMapper{})
 
 	anims, err := anim.LoadLibrary(cfg, animRepo)
 	if err != nil {
@@ -36,7 +37,6 @@ func main() {
 		log.Fatalf("load physics: %v", err)
 	}
 
-	// Load raw tuning once; combat + enemy tuning pull from the same map.
 	tuneParams, err := tuneRepo.List(context.Background())
 	if err != nil {
 		log.Fatalf("list tuning: %v", err)
@@ -49,27 +49,44 @@ func main() {
 	if err != nil {
 		log.Fatalf("load combat tuning: %v", err)
 	}
-	orcTuning, err := enemy.LoadTuning(tuneRepo)
+
+	spawnTuning, err := enemy.LoadSpawnTuning(tuneRepo)
 	if err != nil {
-		log.Fatalf("load orc tuning: %v", err)
+		log.Fatalf("load spawn tuning: %v", err)
 	}
 
 	hitboxSpecs, err := hitboxRepo.List(context.Background())
 	if err != nil {
 		log.Fatalf("list hitboxes: %v", err)
 	}
+	motionSpecs, err := motionRepo.List(context.Background())
+	if err != nil {
+		log.Fatalf("list attack_motions: %v", err)
+	}
+
 	soldierBoxes, err := combat.SoldierBoxes(hitboxSpecs, cfg.RenderScale)
 	if err != nil {
 		log.Fatalf("load soldier boxes: %v", err)
 	}
-	orcBoxes, err := enemy.OrcBoxes(hitboxSpecs, cfg.RenderScale)
+
+	orcKind, err := enemy.BuildKind(enemy.KindConfig{
+		Name: "orc", Prefix: "orc", FrameW: 100, FrameH: 100,
+		AnimLib: anims, HitboxSpecs: hitboxSpecs, MotionSpecs: motionSpecs,
+		TuneRepo: tuneRepo, RenderScale: cfg.RenderScale,
+	})
 	if err != nil {
-		log.Fatalf("load orc boxes: %v", err)
+		log.Fatalf("build orc kind: %v", err)
 	}
-	orcAnims, err := enemy.OrcAnims(anims)
+
+	slimeKind, err := enemy.BuildKind(enemy.KindConfig{
+		Name: "slime", Prefix: "slime", FrameW: 96, FrameH: 96,
+		AnimLib: anims, HitboxSpecs: hitboxSpecs, MotionSpecs: motionSpecs,
+		TuneRepo: tuneRepo, RenderScale: cfg.RenderScale,
+	})
 	if err != nil {
-		log.Fatalf("pick orc anims: %v", err)
+		log.Fatalf("build slime kind: %v", err)
 	}
+
 	heart, ok := anims["heart_beat"]
 	if !ok {
 		log.Fatalf("missing heart_beat anim")
@@ -82,6 +99,18 @@ func main() {
 		log.Fatalf("load font: %v", err)
 	}
 
+	allKinds := []*enemy.Kind{orcKind, slimeKind}
+	var enabledKinds []*enemy.Kind
+	for _, k := range allKinds {
+		if dbgCfg.AllowSpawn(k.Name) {
+			enabledKinds = append(enabledKinds, k)
+		}
+	}
+	if len(enabledKinds) == 0 {
+		log.Fatalf("debug spawn_enemies filter excludes all kinds; known: %v, filter: %v",
+			[]string{orcKind.Name, slimeKind.Name}, dbgCfg.SpawnEnemies)
+	}
+
 	g := game.New(game.Deps{
 		Cfg:          cfg,
 		Anims:        anims,
@@ -89,9 +118,8 @@ func main() {
 		DebugCfg:     dbgCfg,
 		SoldierBoxes: soldierBoxes,
 		CombatTuning: combatTuning,
-		OrcAnims:     orcAnims,
-		OrcBoxes:     orcBoxes,
-		OrcTuning:    orcTuning,
+		EnemyKinds:   enabledKinds,
+		SpawnTuning:  spawnTuning,
 		HeartAnim:    heart,
 		HUDFace:      hud.NewFace(32),
 		OverTitle:    hud.NewFace(96),

@@ -6,11 +6,27 @@ import (
 	"claude-pixel/internal/combat"
 )
 
+// applyMotion applies the per-frame horizontal displacement configured for
+// an attack kind ("attack" | "attack2"). If no motion is configured, VX is
+// left at whatever the Enter handler set (typically 0).
+func applyMotion(e *Enemy, kind string) {
+	m, ok := e.Kind.Motions[kind]
+	if !ok {
+		return
+	}
+	f := e.CurrentFrame()
+	if f >= m.FrameStart && f <= m.FrameEnd {
+		e.VX = float64(e.Facing) * m.VX
+	} else {
+		e.VX = 0
+	}
+}
+
 type fallState struct{}
 
 func (fallState) ID() StateID { return StateFall }
 func (fallState) Enter(e *Enemy) {
-	e.PlayAnim("orc_idle")
+	e.PlayAnim("idle")
 	e.VX = 0
 }
 func (fallState) Exit(e *Enemy) {}
@@ -30,16 +46,16 @@ type runState struct{}
 
 func (runState) ID() StateID { return StateRun }
 func (runState) Enter(e *Enemy) {
-	e.PlayAnim("orc_run")
-	e.IntentTimer = e.Tuning.IntentTickS
+	e.PlayAnim("run")
+	e.IntentTimer = e.Kind.Tuning.IntentTickS
 }
 func (runState) Exit(e *Enemy) {}
 func (runState) Update(e *Enemy, dt time.Duration) StateID {
-	e.VX = float64(e.Facing) * e.RunSpeed
+	e.VX = float64(e.Facing) * e.Kind.Tuning.RunSpeed
 
 	e.IntentTimer -= dt.Seconds()
 	if e.IntentTimer <= 0 {
-		e.IntentTimer = e.Tuning.IntentTickS
+		e.IntentTimer = e.Kind.Tuning.IntentTickS
 		if e.rng.Float64() < 0.5 {
 			if e.rng.Float64() < 0.5 {
 				return StateAttack
@@ -54,12 +70,13 @@ type attackState struct{}
 
 func (attackState) ID() StateID { return StateAttack }
 func (attackState) Enter(e *Enemy) {
-	e.PlayAnim("orc_attack")
+	e.PlayAnim("attack")
 	e.VX = 0
 	e.HitSet = map[combat.Fighter]bool{}
 }
 func (attackState) Exit(e *Enemy) {}
 func (attackState) Update(e *Enemy, dt time.Duration) StateID {
+	applyMotion(e, "attack")
 	if e.Current != nil && e.Current.Done() {
 		return StateRun
 	}
@@ -70,12 +87,13 @@ type attack2State struct{}
 
 func (attack2State) ID() StateID { return StateAttack2 }
 func (attack2State) Enter(e *Enemy) {
-	e.PlayAnim("orc_attack2")
+	e.PlayAnim("attack2")
 	e.VX = 0
 	e.HitSet = map[combat.Fighter]bool{}
 }
 func (attack2State) Exit(e *Enemy) {}
 func (attack2State) Update(e *Enemy, dt time.Duration) StateID {
+	applyMotion(e, "attack2")
 	if e.Current != nil && e.Current.Done() {
 		return StateRun
 	}
@@ -86,7 +104,7 @@ type hurtState struct{}
 
 func (hurtState) ID() StateID { return StateHurt }
 func (hurtState) Enter(e *Enemy) {
-	e.PlayAnim("orc_hurt")
+	e.PlayAnim("hurt")
 }
 func (hurtState) Exit(e *Enemy) {}
 func (hurtState) Update(e *Enemy, dt time.Duration) StateID {
@@ -105,7 +123,7 @@ type deathState struct{}
 
 func (deathState) ID() StateID { return StateDeath }
 func (deathState) Enter(e *Enemy) {
-	e.PlayAnim("orc_death")
+	e.PlayAnim("death")
 	e.VX = 0
 }
 func (deathState) Exit(e *Enemy) {}

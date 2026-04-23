@@ -15,17 +15,17 @@ func (e *Enemy) CurrentFrame() int {
 	return e.Current.FrameIndex()
 }
 
-func (e *Enemy) Body() combat.Box { return e.Boxes["body"] }
+func (e *Enemy) Body() combat.Box { return e.Kind.Boxes["body"] }
 
 func (e *Enemy) ActiveHits() []combat.Box {
 	switch e.CurrentAnim {
-	case "orc_attack":
-		box := e.Boxes["attack"]
+	case "attack":
+		box := e.Kind.Boxes["attack"]
 		if box.Active(e.CurrentFrame()) {
 			return []combat.Box{box}
 		}
-	case "orc_attack2":
-		box := e.Boxes["attack2"]
+	case "attack2":
+		box := e.Kind.Boxes["attack2"]
 		if box.Active(e.CurrentFrame()) {
 			return []combat.Box{box}
 		}

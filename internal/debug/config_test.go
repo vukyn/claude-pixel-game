@@ -21,6 +21,30 @@ func TestLoadConfigValid(t *testing.T) {
 	}
 }
 
+func TestAllowSpawn(t *testing.T) {
+	cases := []struct {
+		name    string
+		filter  []string
+		kind    string
+		allowed bool
+	}{
+		{"empty allows all", nil, "orc", true},
+		{"all keyword", []string{"all"}, "slime", true},
+		{"specific match", []string{"slime"}, "slime", true},
+		{"specific miss", []string{"slime"}, "orc", false},
+		{"multi match", []string{"orc", "slime"}, "orc", true},
+		{"multi miss", []string{"orc"}, "goblin", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := &Config{SpawnEnemies: tc.filter}
+			if got := c.AllowSpawn(tc.kind); got != tc.allowed {
+				t.Fatalf("AllowSpawn(%q) filter=%v = %v, want %v", tc.kind, tc.filter, got, tc.allowed)
+			}
+		})
+	}
+}
+
 func TestLoadConfigRejectsUnknownField(t *testing.T) {
 	dir := t.TempDir()
 	p := filepath.Join(dir, "debug.json")

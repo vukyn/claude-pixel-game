@@ -1,9 +1,11 @@
 {
+  "spawn_enemies": ["all"],
   "sections": [
     { "title": "State",      "fields": ["state", "facing", "grounded"] },
     { "title": "Kinematics", "fields": ["x", "y", "vx", "vy"] },
     { "title": "Animation",  "fields": ["anim_id", "anim_frame", "anim_elapsed_ms"] },
     { "title": "Intent",     "fields": ["intent_left", "intent_right", "intent_jump", "intent_sprint", "intent_attack", "intent_attack2"] },
-    { "title": "Engine",     "fields": ["fps", "tps"] }
+    { "title": "Engine",     "fields": ["fps", "tps"] },
+    { "title": "Enemies",    "fields": ["enemy_count", "orc_next_spawn_s"] }
   ]
 }

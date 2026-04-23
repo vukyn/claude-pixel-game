@@ -13,9 +13,7 @@ import (
 type Config struct {
 	StartX, StartY float64
 	Physics        *player.Physics
-	Tuning         *Tuning
-	Anims          map[string]*anim.Animation
-	Boxes          map[string]combat.Box
+	Kind           *Kind
 	RNG            *rand.Rand
 }
 
@@ -24,11 +22,8 @@ type Enemy struct {
 	Facing       int
 	Grounded     bool
 	Lives        int
-	RunSpeed     float64
 	Physics      *player.Physics
-	Tuning       *Tuning
-	Anims        map[string]*anim.Animation
-	Boxes        map[string]combat.Box
+	Kind         *Kind
 	FSM          *FSM
 	Current      *anim.Animation
 	CurrentAnim  string
@@ -40,17 +35,14 @@ type Enemy struct {
 
 func New(cfg Config) *Enemy {
 	e := &Enemy{
-		X:        cfg.StartX,
-		Y:        cfg.StartY,
-		Facing:   1,
-		Lives:    int(cfg.Tuning.MaxLives),
-		RunSpeed: cfg.Tuning.RunSpeed,
-		Physics:  cfg.Physics,
-		Tuning:   cfg.Tuning,
-		Anims:    cfg.Anims,
-		Boxes:    cfg.Boxes,
-		HitSet:   map[combat.Fighter]bool{},
-		rng:      cfg.RNG,
+		X:       cfg.StartX,
+		Y:       cfg.StartY,
+		Facing:  1,
+		Lives:   int(cfg.Kind.Tuning.MaxLives),
+		Physics: cfg.Physics,
+		Kind:    cfg.Kind,
+		HitSet:  map[combat.Fighter]bool{},
+		rng:     cfg.RNG,
 	}
 	e.FSM = NewFSM(StateFall)
 	e.FSM.Register(&fallState{})
@@ -64,7 +56,7 @@ func New(cfg Config) *Enemy {
 }
 
 func (e *Enemy) PlayAnim(id string) {
-	a, ok := e.Anims[id]
+	a, ok := e.Kind.Anims[id]
 	if !ok {
 		return
 	}
@@ -100,8 +92,8 @@ func (e *Enemy) OnHit(attackerX float64) {
 	if attackerX > e.X {
 		dir = -1.0
 	}
-	e.VX = dir * e.Tuning.HurtBounceVX
-	e.VY = e.Tuning.HurtBounceVY
+	e.VX = dir * e.Kind.Tuning.HurtBounceVX
+	e.VY = e.Kind.Tuning.HurtBounceVY
 	e.Grounded = false
 	e.FSM.Transition(e, StateHurt)
 }
