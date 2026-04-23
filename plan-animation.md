@@ -18,14 +18,18 @@
 - Idle: 6 frames
 - Run: 8 frames
 
-3. HeartBeat:
+3. heartbeat:
 - 4x6 grid
-- using 4 frames for row 4
+- using 4 frames from row 4
 
-4. Slime:
+4. slime:
 - Attack: 8 frames (hitbox 5,6)
 - Attack2: 8 frames (hitbox 4,5,6)
 - Death: 10 frames
 - Hurt: 4 frames
 - Idle: 6 frames
 - Run: 8 frames
+
+5. Stamina bar:
+- 4x10 grid
+- using 10 frames from col 3
