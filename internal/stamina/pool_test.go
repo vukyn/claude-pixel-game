@@ -71,18 +71,36 @@ func TestPoolNoChangeWhenNotSprintingAndFull(t *testing.T) {
 	}
 }
 
-func TestCanSprintBlockedBelow10Percent(t *testing.T) {
+func TestLockoutAfterDepletionUntilFullRefill(t *testing.T) {
 	p := NewPool(100, 20, 20)
-	p.Cur = 9.9
+	// drain to 0
+	for i := 0; i < 300; i++ {
+		p.Update(time.Second/60, true)
+	}
+	if !p.Locked {
+		t.Fatal("want Locked=true at Cur=0")
+	}
 	if p.CanSprint() {
-		t.Fatal("want CanSprint false at 9.9% (below 10%)")
+		t.Fatal("want CanSprint=false while Locked")
 	}
-	p.Cur = 10
-	if !p.CanSprint() {
-		t.Fatal("want CanSprint true at exactly 10%")
+	// partial regen — still locked
+	for i := 0; i < 150; i++ { // 2.5s of regen → Cur ≈ 50
+		p.Update(time.Second/60, false)
 	}
-	p.Cur = 10.1
+	if !p.Locked {
+		t.Fatalf("want still Locked at Cur=%f (< Max)", p.Cur)
+	}
+	if p.CanSprint() {
+		t.Fatal("want CanSprint=false at 50%% while Locked")
+	}
+	// finish regen to full
+	for i := 0; i < 151; i++ {
+		p.Update(time.Second/60, false)
+	}
+	if p.Locked {
+		t.Fatalf("want Locked=false at Cur=%f (>= Max)", p.Cur)
+	}
 	if !p.CanSprint() {
-		t.Fatal("want CanSprint true above 10%")
+		t.Fatal("want CanSprint=true after full refill")
 	}
 }

@@ -7,6 +7,9 @@ type Pool struct {
 	Cur         float64
 	DrainPerSec float64
 	RegenPerSec float64
+	// Locked goes true when Cur reaches 0 and clears only when Cur is fully
+	// refilled to Max. Sprint is blocked while locked.
+	Locked bool
 }
 
 func NewPool(max, drain, regen float64) *Pool {
@@ -26,6 +29,11 @@ func (p *Pool) Update(dt time.Duration, sprinting bool) {
 	if p.Cur > p.Max {
 		p.Cur = p.Max
 	}
+	if p.Cur == 0 {
+		p.Locked = true
+	} else if p.Cur >= p.Max {
+		p.Locked = false
+	}
 }
 
 func (p *Pool) Fraction() float64 {
@@ -35,7 +43,4 @@ func (p *Pool) Fraction() float64 {
 	return p.Cur / p.Max
 }
 
-// MinSprintFraction is the stamina threshold below which sprint is blocked.
-const MinSprintFraction = 0.1
-
-func (p *Pool) CanSprint() bool { return p.Cur >= p.Max*MinSprintFraction }
+func (p *Pool) CanSprint() bool { return !p.Locked && p.Cur > 0 }
