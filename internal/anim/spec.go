@@ -7,21 +7,37 @@ type SpecMapper struct{}
 func (SpecMapper) Table() string { return "animations" }
 
 func (SpecMapper) Columns() []string {
-	return []string{"id", "file", "frame_count", "duration_ms", "loop"}
+	return []string{
+		"id", "file", "frame_count", "duration_ms", "loop",
+		"frame_w", "frame_h", "path", "is_player", "is_enemy",
+		"grid_cols", "grid_rows", "pick_row",
+	}
 }
 
 func (SpecMapper) Scan(row storage.Scanner) (AnimationSpec, error) {
 	var s AnimationSpec
-	var loopInt int
-	err := row.Scan(&s.ID, &s.File, &s.FrameCount, &s.DurationMs, &loopInt)
+	var loopInt, isPlayerInt, isEnemyInt int
+	err := row.Scan(
+		&s.ID, &s.File, &s.FrameCount, &s.DurationMs, &loopInt,
+		&s.FrameW, &s.FrameH, &s.Path, &isPlayerInt, &isEnemyInt,
+		&s.GridCols, &s.GridRows, &s.PickRow,
+	)
 	s.Loop = loopInt != 0
+	s.IsPlayer = isPlayerInt != 0
+	s.IsEnemy = isEnemyInt != 0
 	return s, err
 }
 
 func (SpecMapper) Values(s AnimationSpec) []any {
-	loop := 0
-	if s.Loop {
-		loop = 1
+	b := func(v bool) int {
+		if v {
+			return 1
+		}
+		return 0
 	}
-	return []any{s.ID, s.File, s.FrameCount, s.DurationMs, loop}
+	return []any{
+		s.ID, s.File, s.FrameCount, s.DurationMs, b(s.Loop),
+		s.FrameW, s.FrameH, s.Path, b(s.IsPlayer), b(s.IsEnemy),
+		s.GridCols, s.GridRows, s.PickRow,
+	}
 }

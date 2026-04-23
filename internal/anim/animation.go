@@ -12,6 +12,14 @@ type AnimationSpec struct {
 	FrameCount int
 	DurationMs int
 	Loop       bool
+	FrameW     int
+	FrameH     int
+	Path       string
+	IsPlayer   bool
+	IsEnemy    bool
+	GridCols   int
+	GridRows   int
+	PickRow    int
 }
 
 func (a AnimationSpec) GetID() string { return a.ID }
