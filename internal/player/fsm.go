@@ -15,6 +15,8 @@ const (
 	StateFall    StateID = "fall"
 	StateAttack  StateID = "attack"
 	StateAttack2 StateID = "attack2"
+	StateHit     StateID = "hit"
+	StateDeath   StateID = "death"
 )
 
 type State interface {
@@ -64,4 +66,19 @@ func (f *FSM) Handle(p *Player, in input.Intent, dt time.Duration) {
 		f.current = ns
 		f.current.Enter(p)
 	}
+}
+
+func (f *FSM) Transition(p *Player, to StateID) {
+	if f.current != nil && f.current.ID() == to {
+		return
+	}
+	if f.current != nil {
+		f.current.Exit(p)
+	}
+	ns, ok := f.states[to]
+	if !ok {
+		return
+	}
+	f.current = ns
+	f.current.Enter(p)
 }

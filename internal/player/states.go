@@ -3,6 +3,7 @@ package player
 import (
 	"time"
 
+	"claude-pixel/internal/combat"
 	"claude-pixel/internal/input"
 )
 
@@ -31,7 +32,7 @@ func airSpeed(p *Player, in input.Intent) float64 {
 type idleState struct{}
 
 func (idleState) ID() StateID     { return StateIdle }
-func (idleState) Enter(p *Player) { p.PlayAnim("idle"); p.VX = 0 }
+func (idleState) Enter(p *Player) { p.PlayAnim("soldier_idle"); p.VX = 0 }
 func (idleState) Exit(p *Player)  {}
 func (idleState) Update(p *Player, in input.Intent, dt time.Duration) StateID {
 	if !p.Grounded {
@@ -55,7 +56,7 @@ func (idleState) Update(p *Player, in input.Intent, dt time.Duration) StateID {
 type runState struct{}
 
 func (runState) ID() StateID     { return StateRun }
-func (runState) Enter(p *Player) { p.PlayAnim("run") }
+func (runState) Enter(p *Player) { p.PlayAnim("soldier_run") }
 func (runState) Exit(p *Player)  {}
 func (runState) Update(p *Player, in input.Intent, dt time.Duration) StateID {
 	d := moveDir(in)
@@ -85,7 +86,7 @@ func (runState) Update(p *Player, in input.Intent, dt time.Duration) StateID {
 type jumpState struct{}
 
 func (jumpState) ID() StateID     { return StateJump }
-func (jumpState) Enter(p *Player) { p.PlayAnim("jump"); p.VY = p.Physics.JumpVelocity }
+func (jumpState) Enter(p *Player) { p.PlayAnim("soldier_jump"); p.VY = p.Physics.JumpVelocity }
 func (jumpState) Exit(p *Player)  {}
 func (jumpState) Update(p *Player, in input.Intent, dt time.Duration) StateID {
 	d := moveDir(in)
@@ -109,7 +110,7 @@ func (jumpState) Update(p *Player, in input.Intent, dt time.Duration) StateID {
 type fallState struct{}
 
 func (fallState) ID() StateID     { return StateFall }
-func (fallState) Enter(p *Player) { p.PlayAnim("fall") }
+func (fallState) Enter(p *Player) { p.PlayAnim("soldier_fall") }
 func (fallState) Exit(p *Player)  {}
 func (fallState) Update(p *Player, in input.Intent, dt time.Duration) StateID {
 	d := moveDir(in)
@@ -137,10 +138,11 @@ type attackState struct{}
 
 func (attackState) ID() StateID { return StateAttack }
 func (attackState) Enter(p *Player) {
-	p.PlayAnim("attack")
+	p.PlayAnim("soldier_attack")
 	if p.Grounded {
 		p.VX = 0
 	}
+	p.HitSet = map[combat.Fighter]bool{}
 }
 func (attackState) Exit(p *Player) {}
 func (attackState) Update(p *Player, in input.Intent, dt time.Duration) StateID {
@@ -163,10 +165,11 @@ type attack2State struct{}
 
 func (attack2State) ID() StateID { return StateAttack2 }
 func (attack2State) Enter(p *Player) {
-	p.PlayAnim("attack2")
+	p.PlayAnim("soldier_attack2")
 	if p.Grounded {
 		p.VX = 0
 	}
+	p.HitSet = map[combat.Fighter]bool{}
 }
 func (attack2State) Exit(p *Player) {}
 func (attack2State) Update(p *Player, in input.Intent, dt time.Duration) StateID {
@@ -183,4 +186,35 @@ func (attack2State) Update(p *Player, in input.Intent, dt time.Duration) StateID
 		return StateFall
 	}
 	return StateAttack2
+}
+
+type hitState struct{}
+
+func (hitState) ID() StateID { return StateHit }
+func (hitState) Enter(p *Player) {
+	p.PlayAnim("soldier_hit")
+	p.HitFlag = true
+}
+func (hitState) Exit(p *Player) {
+	p.HitFlag = false
+}
+func (hitState) Update(p *Player, in input.Intent, dt time.Duration) StateID {
+	_ = in
+	if p.Grounded {
+		return StateIdle
+	}
+	return StateHit
+}
+
+type deathState struct{}
+
+func (deathState) ID() StateID { return StateDeath }
+func (deathState) Enter(p *Player) {
+	p.PlayAnim("soldier_death")
+	p.VX = 0
+}
+func (deathState) Exit(p *Player) {}
+func (deathState) Update(p *Player, in input.Intent, dt time.Duration) StateID {
+	_ = in
+	return StateDeath
 }

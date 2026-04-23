@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"claude-pixel/internal/anim"
+	"claude-pixel/internal/combat"
 	"claude-pixel/internal/world"
 )
 
@@ -16,12 +17,20 @@ type Player struct {
 	Physics  *Physics
 	Anims    map[string]*anim.Animation
 	Current  *anim.Animation
+
+	Lives       int
+	HitFlag     bool
+	Boxes       map[string]combat.Box
+	HitSet      map[combat.Fighter]bool
+	CurrentAnim string
 }
 
 type Config struct {
 	StartX, StartY float64
 	Physics        *Physics
 	Anims          map[string]*anim.Animation
+	Boxes          map[string]combat.Box
+	StartLives     int
 }
 
 func (p *Player) PlayAnim(id string) {
@@ -31,6 +40,7 @@ func (p *Player) PlayAnim(id string) {
 	}
 	a.Reset()
 	p.Current = a
+	p.CurrentAnim = id
 }
 
 func (p *Player) ApplyPhysics(w *world.World, dt time.Duration) {
@@ -59,6 +69,9 @@ func New(cfg Config) *Player {
 		Facing:  1,
 		Physics: cfg.Physics,
 		Anims:   cfg.Anims,
+		Boxes:   cfg.Boxes,
+		Lives:   cfg.StartLives,
+		HitSet:  map[combat.Fighter]bool{},
 	}
 	p.FSM = NewFSM(StateIdle)
 	p.FSM.Register(&idleState{})
@@ -67,6 +80,24 @@ func New(cfg Config) *Player {
 	p.FSM.Register(&fallState{})
 	p.FSM.Register(&attackState{})
 	p.FSM.Register(&attack2State{})
+	p.FSM.Register(&hitState{})
+	p.FSM.Register(&deathState{})
 	p.FSM.Start(p)
 	return p
+}
+
+func (p *Player) OnHit(knockbackVX, knockbackVY, attackerX float64) {
+	p.Lives--
+	if p.Lives <= 0 {
+		p.FSM.Transition(p, StateDeath)
+		return
+	}
+	dir := 1.0
+	if attackerX > p.X {
+		dir = -1.0
+	}
+	p.VX = dir * knockbackVX
+	p.VY = knockbackVY
+	p.Grounded = false
+	p.FSM.Transition(p, StateHit)
 }
