@@ -36,6 +36,16 @@ func main() {
 	if err != nil {
 		log.Fatalf("load physics: %v", err)
 	}
+	staminaTuning, err := player.LoadStaminaTuning(tuneRepo)
+	if err != nil {
+		log.Fatalf("load stamina tuning: %v", err)
+	}
+
+	hudLayoutRepo := storage.NewRepository[hud.LayoutRow](db, hud.LayoutMapper{})
+	layout, err := hud.LoadLayout(hudLayoutRepo)
+	if err != nil {
+		log.Fatalf("load hud layout: %v", err)
+	}
 
 	tuneParams, err := tuneRepo.List(context.Background())
 	if err != nil {
@@ -91,6 +101,10 @@ func main() {
 	if !ok {
 		log.Fatalf("missing heart_beat anim")
 	}
+	staminaAnim, okStam := anims["stamina_bar"]
+	if !okStam {
+		log.Fatalf("missing stamina_bar anim")
+	}
 	dbgCfg, err := debug.LoadConfig(cfg.DebugConfigPath)
 	if err != nil {
 		log.Fatalf("load debug config: %v", err)
@@ -112,18 +126,21 @@ func main() {
 	}
 
 	g := game.New(game.Deps{
-		Cfg:          cfg,
-		Anims:        anims,
-		Physics:      physics,
-		DebugCfg:     dbgCfg,
-		SoldierBoxes: soldierBoxes,
-		CombatTuning: combatTuning,
-		EnemyKinds:   enabledKinds,
-		SpawnTuning:  spawnTuning,
-		HeartAnim:    heart,
-		HUDFace:      hud.NewFace(32),
-		OverTitle:    hud.NewFace(96),
-		OverSubtitle: hud.NewFace(32),
+		Cfg:           cfg,
+		Anims:         anims,
+		Physics:       physics,
+		StaminaTuning: staminaTuning,
+		DebugCfg:      dbgCfg,
+		SoldierBoxes:  soldierBoxes,
+		CombatTuning:  combatTuning,
+		EnemyKinds:    enabledKinds,
+		SpawnTuning:   spawnTuning,
+		HeartAnim:     heart,
+		StaminaAnim:   staminaAnim,
+		HUDFace:       hud.NewFace(32),
+		OverTitle:     hud.NewFace(96),
+		OverSubtitle:  hud.NewFace(32),
+		Layout:        layout,
 	})
 
 	ebiten.SetWindowSize(cfg.WindowW, cfg.WindowH)
