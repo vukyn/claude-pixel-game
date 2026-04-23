@@ -21,3 +21,11 @@
 3. HeartBeat:
 - 4x6 grid
 - using 4 frames for row 4
+
+4. Slime:
+- Attack: 8 frames (hitbox 5,6)
+- Attack2: 8 frames (hitbox 4,5,6)
+- Death: 10 frames
+- Hurt: 4 frames
+- Idle: 6 frames
+- Run: 8 frames
