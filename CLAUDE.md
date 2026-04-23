@@ -14,17 +14,19 @@ config/debug.json      # debug overlay layout (F3 toggle)
 data/game.db           # SQLite; regenerable from migrations
 internal/
   config/              # godotenv loader (panics on missing env)
-  storage/             # sqlite Open + migrations/*.sql + Repository[T]
+  storage/             # sqlite Open + migrations/*.sql + Repository[T]; includes hud_layout table
   anim/                # AnimationSpec (per-spec frame dims + path + grid), sheet slicer, LoadLibrary
   combat/              # Box + HitboxSpec mapper, Fighter, Resolve, Tuning, AttackMotionSpec (motion.go)
   enemy/               # Enemy + Kind (kind.go) with AnimPrefix/FrameW/FrameH/Tuning/Boxes/Anims/Motions; FSM (fall/run/attack/attack2/hurt/death), generic AnimsFor/BoxesFor/MotionsFor (loader.go), LoadTuningFor, LoadSpawnTuning
   spawner/             # timer + interval roll + cap enforcement
-  hud/                 # monogram font loader, HUD (heart+lives), GameOver overlay
+  stamina/             # stamina pool; drain while sprinting, regen while not; gates sprint
+  score/               # score accumulator; incremented on enemy kill by kind-specific points value
+  hud/                 # monogram font loader, HUD (heart+lives+stamina+score), layout.go (hud_layout loader), pause.go (pause overlay)
   input/               # Poll() -> Intent (held + edge keys)
   player/              # Physics, Player, FSM with Hit+Death states, combat.Fighter impl
   world/               # flat ground, Clamp helper
   debug/               # field catalog, JSON config, overlay
-  game/                # ebiten Game: wires enemies + spawner + combat dispatch + HUD + state
+  game/                # ebiten Game: wires enemies + spawner + combat dispatch + HUD + state; modes: ModePlaying, ModePaused, ModeGameOver
 ```
 
 ## Run
@@ -52,7 +54,7 @@ make tune ARGS="list"
 
 Output: tabwriter table `KEY VALUE MIN MAX UNIT DESCRIPTION`.
 
-Current keys (25):
+Current keys (30):
 
 Physics (6):
 | Key | Unit | Effect |
@@ -64,7 +66,14 @@ Physics (6):
 | `gravity` | px/s² | Downward accel per tick |
 | `max_fall_speed` | px/s | Terminal vertical velocity |
 
-Combat + enemy (19):
+Stamina (3):
+| Key | Unit | Effect |
+|---|---|---|
+| `stamina_max` | — | Max stamina pool (default 100) |
+| `stamina_drain_per_s` | /s | Drain rate while sprinting |
+| `stamina_regen_per_s` | /s | Regen rate while not sprinting |
+
+Combat + enemy (21):
 | Key | Unit | Effect |
 |---|---|---|
 | `soldier_max_lives` | — | Starting soldier lives (default 10) |
@@ -77,12 +86,14 @@ Combat + enemy (19):
 | `orc_hurt_bounce_vy` | px/s | Upward pop on hurt |
 | `orc_intent_tick_s` | s | Interval for run-vs-attack reroll |
 | `orc_foot_padding` | px | Transparent px at orc sprite frame bottom |
+| `orc_points` | — | Points awarded on orc kill (default 10) |
 | `slime_max_lives` | — | Starting slime lives (default 2) |
 | `slime_run_speed` | px/s | Slime ground speed |
 | `slime_hurt_bounce_vx` | px/s | Horizontal bounce on hurt |
 | `slime_hurt_bounce_vy` | px/s | Upward pop on hurt |
 | `slime_intent_tick_s` | s | Interval for run-vs-attack reroll |
 | `slime_foot_padding` | px | Transparent px at slime sprite frame bottom |
+| `slime_points` | — | Points awarded on slime kill (default 15) |
 | `enemy_spawn_min_s` | s | Minimum enemy spawn interval (all kinds) |
 | `enemy_spawn_max_s` | s | Maximum enemy spawn interval (all kinds) |
 | `enemy_max_alive` | — | Concurrent enemy cap across all kinds (default 3) |
@@ -113,6 +124,19 @@ go run ./cmd/tune motions delete <id>
 
 Mirrors the `hitboxes` subcommand shape. Used to retune slime backstep feel and to add motions for future enemy kinds.
 
+### HUD layout (`hud_layout` table)
+
+```bash
+go run ./cmd/tune hud list
+go run ./cmd/tune hud get <key>
+go run ./cmd/tune hud set <key> <field> <value>   # fields: x, y, w, h, anchor, scale
+```
+
+Keys: `heart`, `lives_text`, `score_text`, `stamina_bar`.
+Anchors: `top_left`, `top_right`, `bottom_left`, `bottom_right`.
+`x/y` = offset of the element's nearest corner from the screen anchor corner.
+For text elements, stored `w/h=0` → width is measured at draw time.
+
 ## Debug overlay
 
 Toggle **F3** in-game. Layout `config/debug.json` — edit, restart. Unknown field keys = boot-time error listing valid keys. Catalog: `internal/debug/fields.go` (23 fields: 19 player/engine + 4 orc/lives). **F4** toggles hitbox debug draw (green = body, red = active attack box).
@@ -128,13 +152,15 @@ Toggle **F3** in-game. Layout `config/debug.json` — edit, restart. Unknown fie
 | Attack2 | `K` or `C` (edge) |
 | Debug overlay | `F3` (edge) |
 | Hitbox debug | `F4` (edge) |
+| Pause | `Esc` (edge) |
+| Resume (while paused) | Any key (edge, action swallowed that tick) |
 | Restart (on GAME OVER) | `R` (edge) |
 
 Shift alone = no-op. No double-jump. Attacks cancelable by Jump only (grounded).
 
 ## State machines
 
-**Soldier** (8 states): `Idle`, `Run`, `Jump`, `Fall`, `Attack`, `Attack2`, `Hit`, `Death`. `Hit` = bounced back + airborne i-frame until grounded. `Death` = 10 lives consumed, terminal.
+**Soldier** (8 states): `Idle`, `Run`, `Jump`, `Fall`, `Attack`, `Attack2`, `Hit`, `Death`. `Hit` = bounced back + airborne i-frame until grounded. `Death` = 10 lives consumed, terminal. Sprint is gated by stamina — depletes while sprinting, regenerates otherwise.
 
 **Orc** (6 states): `Fall` (from spawn), `Run`, `Attack`, `Attack2`, `Hurt`, `Death`. Every `orc_intent_tick_s`, Run either stays or 50/50 picks `Attack`/`Attack2`. 2 lives — second hit kills. Hurt anim = i-frame window. `internal/enemy/states.go`.
 
@@ -154,7 +180,7 @@ Hitbox dims stored in `hitboxes` table (not in `tuning`). Retune via new migrati
 
 ## HUD + font
 
-Top-right: heart anim (row 3 of 4×6 grid, 4 frames, 400ms loop) + monogram-font `xN` lives counter. GAME OVER overlay (dim + "GAME OVER" @96 + "Press R to restart" @32) on soldier death. Font loaded from `FONT_PATH` env (`./assets/fonts/monogram/ttf/monogram.ttf`) via `text/v2`.
+Heart anim from `assets/huds/healthbar/heartbeat.png` (row 3 of 4×6 grid, 4 frames, 400ms loop) + monogram-font `xN` lives counter. Stamina bar drawn from `assets/huds/healthbar/healthbar.png`. Score text shown top-left. Element positions loaded from `hud_layout` table via `internal/hud/layout.go`. GAME OVER overlay (dim + "GAME OVER" @96 + "Press R to restart" @32) on soldier death. Pause overlay (dim + "PAUSED" + "Press any key to resume") on `ModePaused`. Font loaded from `FONT_PATH` env (`./assets/fonts/monogram/ttf/monogram.ttf`) via `text/v2`.
 
 ## Migrations
 
