@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 
 	"claude-pixel/internal/config"
@@ -19,17 +20,29 @@ func LoadLibrary(cfg *config.Config, repo *storage.Repository[AnimationSpec]) (m
 	out := make(map[string]*Animation, len(specs))
 	for i := range specs {
 		spec := specs[i]
-		path := filepath.Join(cfg.AssetsDir, spec.File)
+		path := filepath.Join(cfg.AssetsDir, spec.Path)
 		img, _, err := ebitenutil.NewImageFromFile(path)
 		if err != nil {
 			return nil, fmt.Errorf("load %s: %w", path, err)
 		}
-		wantW := cfg.SpriteFrameW * spec.FrameCount
+
 		w, h := img.Bounds().Dx(), img.Bounds().Dy()
-		if w != wantW || h != cfg.SpriteFrameH {
-			return nil, fmt.Errorf("sheet %s: got %dx%d, want %dx%d", spec.File, w, h, wantW, cfg.SpriteFrameH)
+		var frames []*ebiten.Image
+
+		if spec.GridCols > 0 {
+			wantW := spec.FrameW * spec.GridCols
+			wantH := spec.FrameH * spec.GridRows
+			if w != wantW || h != wantH {
+				return nil, fmt.Errorf("sheet %s (grid): got %dx%d, want %dx%d", spec.Path, w, h, wantW, wantH)
+			}
+			frames = SliceGrid(img, spec.FrameW, spec.FrameH, spec.GridCols, spec.GridRows, spec.PickRow, spec.FrameCount)
+		} else {
+			wantW := spec.FrameW * spec.FrameCount
+			if w != wantW || h != spec.FrameH {
+				return nil, fmt.Errorf("sheet %s (strip): got %dx%d, want %dx%d", spec.Path, w, h, wantW, spec.FrameH)
+			}
+			frames = Slice(img, spec.FrameW, spec.FrameH, spec.FrameCount)
 		}
-		frames := Slice(img, cfg.SpriteFrameW, cfg.SpriteFrameH, spec.FrameCount)
 		out[spec.ID] = NewAnimation(&spec, frames)
 	}
 	return out, nil
