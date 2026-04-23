@@ -98,9 +98,9 @@ func New(d Deps) *Game {
 	}
 	g.overlay = debug.NewOverlay(d.DebugCfg, g)
 
-	orcHalfW := float64(100*d.Cfg.RenderScale) / 2
-	spawnXMin := orcHalfW
-	spawnXMax := float64(d.Cfg.WindowW) - orcHalfW
+	orcBodyHalfW := float64(d.OrcBoxes["body"].W) / 2
+	spawnXMin := orcBodyHalfW
+	spawnXMax := float64(d.Cfg.WindowW) - orcBodyHalfW
 	orcSpriteH := float64(100 * d.Cfg.RenderScale)
 
 	g.spawner = spawner.New(spawner.Config{
@@ -166,14 +166,18 @@ func (g *Game) Update() error {
 		e.ApplyPhysics(g.world, dt)
 	}
 
-	soldierHalfW := float64(120*g.cfg.RenderScale) / 2
-	g.player.X = world.Clamp(g.player.X, soldierHalfW, float64(g.cfg.WindowW)-soldierHalfW)
+	// Boundary: clamp by body hitbox half-width (post-scale) so sprite transparency
+	// doesn't eat into usable play area.
+	soldierBodyHalfW := float64(g.player.Boxes["body"].W) / 2
+	g.player.X = world.Clamp(g.player.X, soldierBodyHalfW, float64(g.cfg.WindowW)-soldierBodyHalfW)
 
-	orcHalfW := float64(100*g.cfg.RenderScale) / 2
 	for _, e := range g.enemies {
-		clamped := world.Clamp(e.X, orcHalfW, float64(g.cfg.WindowW)-orcHalfW)
+		orcBodyHalfW := float64(e.Boxes["body"].W) / 2
+		leftLimit := orcBodyHalfW
+		rightLimit := float64(g.cfg.WindowW) - orcBodyHalfW
+		clamped := world.Clamp(e.X, leftLimit, rightLimit)
 		if clamped != e.X && e.FSM.CurrentID() == enemy.StateRun {
-			if e.X <= orcHalfW {
+			if e.X <= leftLimit {
 				e.Facing = 1
 			} else {
 				e.Facing = -1
@@ -305,8 +309,11 @@ func (g *Game) drawEnemy(screen *ebiten.Image, e *enemy.Enemy) {
 	if e.Current == nil || e.Current.CurrentFrame() == nil {
 		return
 	}
+	// Orc sprite has ~20px transparent padding at frame bottom; anchor the
+	// frame such that the visible feet (not the frame bottom) align with e.Y.
+	const orcVisibleFootPadding = 20
 	op := &ebiten.DrawImageOptions{}
-	op.GeoM.Translate(-100.0/2, -100.0)
+	op.GeoM.Translate(-100.0/2, -100.0+orcVisibleFootPadding)
 	if e.Facing < 0 {
 		op.GeoM.Scale(-1, 1)
 	}

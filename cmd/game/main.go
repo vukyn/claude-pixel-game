@@ -58,11 +58,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("list hitboxes: %v", err)
 	}
-	soldierBoxes, err := combat.SoldierBoxes(hitboxSpecs)
+	soldierBoxes, err := combat.SoldierBoxes(hitboxSpecs, cfg.RenderScale)
 	if err != nil {
 		log.Fatalf("load soldier boxes: %v", err)
 	}
-	orcBoxes, err := enemy.OrcBoxes(hitboxSpecs)
+	orcBoxes, err := enemy.OrcBoxes(hitboxSpecs, cfg.RenderScale)
 	if err != nil {
 		log.Fatalf("load orc boxes: %v", err)
 	}

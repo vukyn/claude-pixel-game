@@ -34,13 +34,14 @@ func LoadTuning(tuning map[string]float64) (*Tuning, error) {
 }
 
 // SoldierBoxes filters HitboxSpec list down to soldier boxes keyed by kind.
-func SoldierBoxes(specs []HitboxSpec) (map[string]Box, error) {
+// Offsets and dims are multiplied by `scale` so boxes match the rendered sprite scale.
+func SoldierBoxes(specs []HitboxSpec, scale int) (map[string]Box, error) {
 	out := make(map[string]Box, 3)
 	for _, s := range specs {
 		if s.Owner != "soldier" {
 			continue
 		}
-		out[s.Kind] = s.ToBox()
+		out[s.Kind] = s.ToBox().Scale(scale)
 	}
 	if _, ok := out["body"]; !ok {
 		return nil, fmt.Errorf("soldier hitboxes: missing body")
