@@ -20,7 +20,7 @@ func (p *Pool) Update(dt time.Duration, sprinting bool) {
 	} else {
 		p.Cur += p.RegenPerSec * dtS
 	}
-	if p.Cur < 0 {
+	if p.Cur < 1e-4 {
 		p.Cur = 0
 	}
 	if p.Cur > p.Max {
@@ -35,4 +35,4 @@ func (p *Pool) Fraction() float64 {
 	return p.Cur / p.Max
 }
 
-func (p *Pool) CanSprint() bool { return p.Cur >= 0.01 }
+func (p *Pool) CanSprint() bool { return p.Cur > 0 }
