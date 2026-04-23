@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"claude-pixel/internal/anim"
+	"claude-pixel/internal/combat"
 	"claude-pixel/internal/input"
 )
 
@@ -46,25 +47,35 @@ func TestFSMTransitions(t *testing.T) {
 	}
 }
 
+func stubAnim(id string, frames, durMs int, loop bool) *anim.Animation {
+	spec := &anim.AnimationSpec{ID: id, FrameCount: frames, DurationMs: durMs, Loop: loop}
+	return anim.NewAnimation(spec, nil)
+}
+
 func newTestPlayer(t *testing.T) *Player {
 	t.Helper()
-	specs := map[string]*anim.AnimationSpec{
-		"idle":    {ID: "idle", FrameCount: 1, DurationMs: 100, Loop: true},
-		"run":     {ID: "run", FrameCount: 1, DurationMs: 100, Loop: true},
-		"jump":    {ID: "jump", FrameCount: 1, DurationMs: 100, Loop: false},
-		"fall":    {ID: "fall", FrameCount: 1, DurationMs: 100, Loop: false},
-		"dash":    {ID: "dash", FrameCount: 1, DurationMs: 100, Loop: false},
-		"attack":  {ID: "attack", FrameCount: 1, DurationMs: 100, Loop: false},
-		"attack2": {ID: "attack2", FrameCount: 1, DurationMs: 100, Loop: false},
+	anims := map[string]*anim.Animation{
+		"soldier_idle":    stubAnim("soldier_idle", 10, 1000, true),
+		"soldier_run":     stubAnim("soldier_run", 10, 1000, true),
+		"soldier_jump":    stubAnim("soldier_jump", 3, 500, false),
+		"soldier_fall":    stubAnim("soldier_fall", 3, 500, false),
+		"soldier_attack":  stubAnim("soldier_attack", 4, 500, false),
+		"soldier_attack2": stubAnim("soldier_attack2", 6, 750, false),
+		"soldier_hit":     stubAnim("soldier_hit", 1, 200, false),
+		"soldier_death":   stubAnim("soldier_death", 10, 1000, false),
 	}
-	anims := map[string]*anim.Animation{}
-	for k, s := range specs {
-		anims[k] = anim.NewAnimation(s, nil)
+	boxes := map[string]combat.Box{
+		"body":    {OffsetX: -20, OffsetY: -70, W: 40, H: 70, FrameStart: -1, FrameEnd: -1},
+		"attack":  {OffsetX: 20, OffsetY: -60, W: 60, H: 50, FrameStart: 1, FrameEnd: 2},
+		"attack2": {OffsetX: 20, OffsetY: -60, W: 80, H: 60, FrameStart: 2, FrameEnd: 4},
 	}
 	return New(Config{
-		StartX: 0, StartY: 0,
-		Physics: &Physics{RunSpeed: 100, AirControl: 1, JumpVelocity: -100, Gravity: 500, MaxFallSpeed: 500, SprintSpeed: 200},
-		Anims:   anims,
+		StartX:     400,
+		StartY:     600,
+		Physics:    &Physics{RunSpeed: 100, SprintSpeed: 200, AirControl: 1, JumpVelocity: -100, Gravity: 500, MaxFallSpeed: 500},
+		Anims:      anims,
+		Boxes:      boxes,
+		StartLives: 10,
 	})
 }
 
@@ -147,5 +158,46 @@ func TestShiftAloneDoesNotMove(t *testing.T) {
 	}
 	if p.VX != 0 {
 		t.Fatalf("expected VX=0 with Shift alone, got %v", p.VX)
+	}
+}
+
+func TestPlayerOnHitEntersHit(t *testing.T) {
+	p := newTestPlayer(t)
+	p.Lives = 3
+	p.OnHit(200, -300, p.X+10)
+	if p.FSM.CurrentID() != StateHit {
+		t.Errorf("want hit, got %q", p.FSM.CurrentID())
+	}
+	if p.Lives != 2 {
+		t.Errorf("want 2 lives, got %d", p.Lives)
+	}
+	if p.Grounded {
+		t.Errorf("expected airborne after knockback")
+	}
+	if p.VX >= 0 {
+		t.Errorf("expected leftward bounce, got VX=%v", p.VX)
+	}
+}
+
+func TestPlayerHitToIdleOnGround(t *testing.T) {
+	p := newTestPlayer(t)
+	p.Lives = 3
+	p.OnHit(200, -300, p.X+10)
+	p.Grounded = true
+	p.FSM.Handle(p, input.Intent{}, 16*time.Millisecond)
+	if p.FSM.CurrentID() != StateIdle {
+		t.Errorf("want idle after land, got %q", p.FSM.CurrentID())
+	}
+	if p.HitFlag {
+		t.Errorf("HitFlag should be cleared on Exit")
+	}
+}
+
+func TestPlayerDeathOnZeroLives(t *testing.T) {
+	p := newTestPlayer(t)
+	p.Lives = 1
+	p.OnHit(200, -300, p.X+10)
+	if p.FSM.CurrentID() != StateDeath {
+		t.Errorf("want death, got %q", p.FSM.CurrentID())
 	}
 }
