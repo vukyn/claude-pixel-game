@@ -1,10 +1,14 @@
 package enemy
 
 import (
+	"context"
 	"testing"
 
 	"claude-pixel/internal/anim"
 	"claude-pixel/internal/combat"
+	"claude-pixel/internal/config"
+	"claude-pixel/internal/player"
+	"claude-pixel/internal/storage"
 )
 
 func TestAnimsForReturnsUnprefixedMap(t *testing.T) {
@@ -95,5 +99,39 @@ func TestMotionsForEmptyWhenNoMatch(t *testing.T) {
 	out := MotionsFor(nil, "orc")
 	if len(out) != 0 {
 		t.Errorf("want empty, got %d", len(out))
+	}
+}
+
+func TestLoadTuningForPoints(t *testing.T) {
+	cfg := &config.Config{DBPath: ":memory:"}
+	db, err := storage.Open(cfg)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer db.Close()
+
+	repo := storage.NewRepository(db, player.TuningMapper{})
+	ctx := context.Background()
+
+	seed := func(key string, value float64) {
+		t.Helper()
+		if err := repo.Upsert(ctx, player.TuningParam{Key: key, Value: value}); err != nil {
+			t.Fatalf("seed %s: %v", key, err)
+		}
+	}
+	seed("orc_max_lives", 2)
+	seed("orc_run_speed", 80)
+	seed("orc_intent_tick_s", 1.5)
+	seed("orc_hurt_bounce_vx", 120)
+	seed("orc_hurt_bounce_vy", -200)
+	seed("orc_foot_padding", 4)
+	seed("orc_points", 10)
+
+	tun, err := LoadTuningFor(repo, "orc")
+	if err != nil {
+		t.Fatalf("LoadTuningFor: %v", err)
+	}
+	if tun.Points != 10 {
+		t.Errorf("Points: got %d, want 10", tun.Points)
 	}
 }

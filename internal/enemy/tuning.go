@@ -17,6 +17,7 @@ type Tuning struct {
 	HurtBounceVX float64
 	HurtBounceVY float64
 	FootPadding  int
+	Points       int
 }
 
 // SpawnTuning is global (all kinds) and lives under the enemy_* key prefix.
@@ -76,6 +77,11 @@ func LoadTuningFor(repo *storage.Repository[player.TuningParam], prefix string) 
 		return nil, err
 	}
 	t.FootPadding = int(pad)
+	pts, err := pick(prefix + "_points")
+	if err != nil {
+		return nil, err
+	}
+	t.Points = int(pts)
 	return t, nil
 }
 
