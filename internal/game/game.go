@@ -67,15 +67,18 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		color.RGBA{0x3A, 0x3A, 0x3A, 0xFF}, false)
 
 	if g.player.Current != nil && g.player.Current.CurrentFrame() != nil {
+		frame := g.player.Current.CurrentFrame()
+		b := frame.Bounds()
+		fw, fh := b.Dx(), b.Dy()
 		op := &ebiten.DrawImageOptions{}
-		op.GeoM.Translate(-float64(g.cfg.SpriteFrameW)/2, -float64(g.cfg.SpriteFrameH))
+		op.GeoM.Translate(-float64(fw)/2, -float64(fh))
 		if g.player.Facing < 0 {
 			op.GeoM.Scale(-1, 1)
 		}
 		op.GeoM.Scale(float64(g.cfg.RenderScale), float64(g.cfg.RenderScale))
 		op.GeoM.Translate(g.player.X, g.player.Y)
 		op.Filter = ebiten.FilterNearest
-		screen.DrawImage(g.player.Current.CurrentFrame(), op)
+		screen.DrawImage(frame, op)
 	}
 
 	g.overlay.Draw(screen)

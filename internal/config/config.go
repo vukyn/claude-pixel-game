@@ -11,12 +11,11 @@ import (
 type Config struct {
 	DBPath          string
 	AssetsDir       string
-	SpriteFrameW    int
-	SpriteFrameH    int
 	WindowW         int
 	WindowH         int
 	RenderScale     int
 	DebugConfigPath string
+	FontPath        string
 }
 
 func Load() *Config {
@@ -24,12 +23,11 @@ func Load() *Config {
 	return &Config{
 		DBPath:          mustString("DB_PATH"),
 		AssetsDir:       mustString("ASSETS_DIR"),
-		SpriteFrameW:    mustInt("SPRITE_FRAME_W"),
-		SpriteFrameH:    mustInt("SPRITE_FRAME_H"),
 		WindowW:         mustInt("WINDOW_WIDTH"),
 		WindowH:         mustInt("WINDOW_HEIGHT"),
 		RenderScale:     mustInt("RENDER_SCALE"),
 		DebugConfigPath: mustString("DEBUG_CONFIG_PATH"),
+		FontPath:        mustString("FONT_PATH"),
 	}
 }
 

@@ -8,14 +8,13 @@ import (
 func TestLoadReadsEnvVars(t *testing.T) {
 	os.Setenv("DB_PATH", "/tmp/x.db")
 	os.Setenv("ASSETS_DIR", "/tmp/assets")
-	os.Setenv("SPRITE_FRAME_W", "120")
-	os.Setenv("SPRITE_FRAME_H", "80")
 	os.Setenv("WINDOW_WIDTH", "1280")
 	os.Setenv("WINDOW_HEIGHT", "720")
 	os.Setenv("RENDER_SCALE", "3")
 	os.Setenv("DEBUG_CONFIG_PATH", "/tmp/debug.json")
+	os.Setenv("FONT_PATH", "/fonts/m.ttf")
 	t.Cleanup(func() {
-		for _, k := range []string{"DB_PATH", "ASSETS_DIR", "SPRITE_FRAME_W", "SPRITE_FRAME_H", "WINDOW_WIDTH", "WINDOW_HEIGHT", "RENDER_SCALE", "DEBUG_CONFIG_PATH"} {
+		for _, k := range []string{"DB_PATH", "ASSETS_DIR", "WINDOW_WIDTH", "WINDOW_HEIGHT", "RENDER_SCALE", "DEBUG_CONFIG_PATH", "FONT_PATH"} {
 			os.Unsetenv(k)
 		}
 	})
@@ -23,12 +22,11 @@ func TestLoadReadsEnvVars(t *testing.T) {
 	cfg := Load()
 	if cfg.DBPath != "/tmp/x.db" ||
 		cfg.AssetsDir != "/tmp/assets" ||
-		cfg.SpriteFrameW != 120 ||
-		cfg.SpriteFrameH != 80 ||
 		cfg.WindowW != 1280 ||
 		cfg.WindowH != 720 ||
 		cfg.RenderScale != 3 ||
-		cfg.DebugConfigPath != "/tmp/debug.json" {
+		cfg.DebugConfigPath != "/tmp/debug.json" ||
+		cfg.FontPath != "/fonts/m.ttf" {
 		t.Fatalf("unexpected cfg: %+v", cfg)
 	}
 }
