@@ -246,11 +246,6 @@ func (g *Game) Update() error {
 	if g.player.Current != nil {
 		g.player.Current.Update(dt)
 	}
-	for _, e := range g.enemies {
-		if e.Current != nil && e.CurrentState != "fall" {
-			e.Current.Update(dt)
-		}
-	}
 	g.hud.Update(dt)
 
 	if spawned := g.spawner.Tick(dt, len(g.enemies)); spawned != nil {
