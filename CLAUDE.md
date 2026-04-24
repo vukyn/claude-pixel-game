@@ -54,7 +54,7 @@ make tune ARGS="list"
 
 Output: tabwriter table `KEY VALUE MIN MAX UNIT DESCRIPTION`.
 
-Current keys (30):
+Current keys (26):
 
 Physics (6):
 | Key | Unit | Effect |
@@ -73,7 +73,7 @@ Stamina (3):
 | `stamina_drain_per_s` | /s | Drain rate while sprinting |
 | `stamina_regen_per_s` | /s | Regen rate while not sprinting |
 
-Combat + enemy (21):
+Combat + enemy (17):
 | Key | Unit | Effect |
 |---|---|---|
 | `soldier_max_lives` | — | Starting soldier lives (default 10) |
@@ -81,17 +81,13 @@ Combat + enemy (21):
 | `soldier_knockback_vy` | px/s | Upward pop when hit (airborne i-frame) |
 | `soldier_foot_padding` | px | Transparent px at soldier sprite frame bottom |
 | `orc_max_lives` | — | Starting orc lives (default 2) |
-| `orc_run_speed` | px/s | Orc ground speed |
 | `orc_hurt_bounce_vx` | px/s | Horizontal bounce on hurt |
 | `orc_hurt_bounce_vy` | px/s | Upward pop on hurt |
-| `orc_intent_tick_s` | s | Interval for run-vs-attack reroll |
 | `orc_foot_padding` | px | Transparent px at orc sprite frame bottom |
 | `orc_points` | — | Points awarded on orc kill (default 10) |
 | `slime_max_lives` | — | Starting slime lives (default 2) |
-| `slime_run_speed` | px/s | Slime ground speed |
 | `slime_hurt_bounce_vx` | px/s | Horizontal bounce on hurt |
 | `slime_hurt_bounce_vy` | px/s | Upward pop on hurt |
-| `slime_intent_tick_s` | s | Interval for run-vs-attack reroll |
 | `slime_foot_padding` | px | Transparent px at slime sprite frame bottom |
 | `slime_points` | — | Points awarded on slime kill (default 15) |
 | `enemy_spawn_min_s` | s | Minimum enemy spawn interval (all kinds) |
@@ -111,18 +107,6 @@ Exit 1, one of:
 - `value out of range: X not in [min, max] unit` (validator)
 
 Changes apply next `make run`. No hot reload.
-
-### Motions (`attack_motions` table)
-
-```bash
-go run ./cmd/tune motions list
-go run ./cmd/tune motions get <id>
-go run ./cmd/tune motions set <id> <field> <value>   # fields: owner, kind, vx, frame_start, frame_end
-go run ./cmd/tune motions add <id> <owner> <kind> <vx> <fs> <fe>
-go run ./cmd/tune motions delete <id>
-```
-
-Mirrors the `hitboxes` subcommand shape. Used to retune slime backstep feel and to add motions for future enemy kinds.
 
 ### HUD layout (`hud_layout` table)
 
