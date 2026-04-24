@@ -83,6 +83,7 @@ func main() {
 		Name: "orc", Prefix: "orc", FrameW: 100, FrameH: 100,
 		AnimLib: anims, HitboxSpecs: hitboxSpecs, MotionSpecs: motionSpecs,
 		TuneRepo: tuneRepo, RenderScale: cfg.RenderScale,
+		BehaviorPath: cfg.AssetsDir + "/behaviors/orc.json",
 	})
 	if err != nil {
 		log.Fatalf("build orc kind: %v", err)
@@ -92,6 +93,7 @@ func main() {
 		Name: "slime", Prefix: "slime", FrameW: 96, FrameH: 96,
 		AnimLib: anims, HitboxSpecs: hitboxSpecs, MotionSpecs: motionSpecs,
 		TuneRepo: tuneRepo, RenderScale: cfg.RenderScale,
+		BehaviorPath: cfg.AssetsDir + "/behaviors/slime.json",
 	})
 	if err != nil {
 		log.Fatalf("build slime kind: %v", err)
