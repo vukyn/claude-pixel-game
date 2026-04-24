@@ -11,17 +11,30 @@ type ActionFn func(args map[string]any, ctx *Ctx) (Status, error)
 // into Success/Failure.
 type ConditionFn func(args map[string]any, ctx *Ctx) (bool, error)
 
+// actions and conditions are written exclusively during package init() and
+// read-only thereafter. Not safe for concurrent modification.
 var (
 	actions    = map[string]ActionFn{}
 	conditions = map[string]ConditionFn{}
 )
 
-// RegisterAction adds a new action by name. Last registration wins. Call
-// from init() in client packages.
-func RegisterAction(name string, fn ActionFn) { actions[name] = fn }
+// RegisterAction registers fn under name. Panics on duplicate name to surface
+// init-time mis-wiring loudly. Call from package init() only.
+func RegisterAction(name string, fn ActionFn) {
+	if _, exists := actions[name]; exists {
+		panic("behavior: duplicate action registration: " + name)
+	}
+	actions[name] = fn
+}
 
-// RegisterCondition adds a new condition by name. Last registration wins.
-func RegisterCondition(name string, fn ConditionFn) { conditions[name] = fn }
+// RegisterCondition registers fn under name. Panics on duplicate name.
+// Call from package init() only.
+func RegisterCondition(name string, fn ConditionFn) {
+	if _, exists := conditions[name]; exists {
+		panic("behavior: duplicate condition registration: " + name)
+	}
+	conditions[name] = fn
+}
 
 // HasAction reports whether name is registered. Used by the loader to
 // reject unknown actions at parse time.

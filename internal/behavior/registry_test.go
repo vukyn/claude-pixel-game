@@ -161,3 +161,23 @@ func TestHasActionHasConditionLookup(t *testing.T) {
 		t.Fatal("HasCondition(nope_nada) true")
 	}
 }
+
+func TestRegisterDuplicateActionPanics(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Fatal("expected panic on duplicate action registration")
+		}
+	}()
+	// "goto" is already registered by init.
+	RegisterAction("goto", func(_ map[string]any, _ *Ctx) (Status, error) { return StatusSuccess, nil })
+}
+
+func TestRegisterDuplicateConditionPanics(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Fatal("expected panic on duplicate condition registration")
+		}
+	}()
+	// "grounded" is already registered by init.
+	RegisterCondition("grounded", func(_ map[string]any, _ *Ctx) (bool, error) { return true, nil })
+}
