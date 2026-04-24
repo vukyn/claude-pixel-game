@@ -1,0 +1,56 @@
+{
+  "kind": "slime",
+  "states": [
+    {
+      "id": "fall",
+      "anim": "idle",
+      "decision": false,
+      "exit_on": "grounded",
+      "next": "run",
+      "on_exit_actions": ["randomize_facing"]
+    },
+    {
+      "id": "run",
+      "anim": "run",
+      "decision": true,
+      "bt": {
+        "type": "sequence",
+        "children": [
+          { "type": "action", "name": "set_vx_forward", "args": { "speed": 60 } },
+          { "type": "wait", "seconds": 2 },
+          {
+            "type": "chance",
+            "branches": [
+              {
+                "weight": 50,
+                "node": {
+                  "type": "chance",
+                  "branches": [
+                    { "weight": 50, "node": { "type": "action", "name": "goto", "args": { "state": "attack" } } },
+                    { "weight": 50, "node": { "type": "action", "name": "goto", "args": { "state": "attack2" } } }
+                  ]
+                }
+              },
+              {
+                "weight": 50,
+                "node": {
+                  "type": "chance",
+                  "branches": [
+                    { "weight": 50, "node": { "type": "action", "name": "flip_facing" } },
+                    { "weight": 50, "node": { "type": "action", "name": "stop" } }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    { "id": "attack",  "anim": "attack",  "decision": false, "exit_on": "anim_done", "next": "run" },
+    { "id": "attack2", "anim": "attack2", "decision": false, "exit_on": "anim_done", "next": "run",
+                       "on_frame_vx": [ { "frame_start": 3, "frame_end": 5, "vx": -60 } ] },
+    { "id": "hurt",    "anim": "hurt",    "decision": false, "exit_on": "anim_done_and_grounded", "next": "run",
+                       "on_exit_actions": ["randomize_facing"] },
+    { "id": "death",   "anim": "death",   "decision": false, "exit_on": "anim_done", "next": "__dead" }
+  ]
+}

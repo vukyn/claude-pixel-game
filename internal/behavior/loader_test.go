@@ -266,3 +266,49 @@ func TestBuildNodeChanceFractionalWeightRejected(t *testing.T) {
 		t.Fatalf("err = %v", err)
 	}
 }
+
+// ------ golden-file tests (Task 8) ------
+
+func TestLoadFileGoldenOrc(t *testing.T) {
+	f, err := LoadFile("../../assets/behaviors/orc.json")
+	if err != nil {
+		t.Fatalf("LoadFile orc: %v", err)
+	}
+	if f.Kind != "orc" {
+		t.Fatalf("kind = %q", f.Kind)
+	}
+	needStates := []string{"fall", "run", "attack", "attack2", "hurt", "death"}
+	have := map[string]bool{}
+	for _, s := range f.States {
+		have[s.ID] = true
+	}
+	for _, id := range needStates {
+		if !have[id] {
+			t.Fatalf("missing state %q in orc.json", id)
+		}
+	}
+}
+
+func TestLoadFileGoldenSlime(t *testing.T) {
+	f, err := LoadFile("../../assets/behaviors/slime.json")
+	if err != nil {
+		t.Fatalf("LoadFile slime: %v", err)
+	}
+	var a2 *State
+	for i := range f.States {
+		if f.States[i].ID == "attack2" {
+			a2 = &f.States[i]
+			break
+		}
+	}
+	if a2 == nil {
+		t.Fatal("slime: missing attack2 state")
+	}
+	if len(a2.OnFrameVX) != 1 {
+		t.Fatalf("slime attack2 on_frame_vx = %d, want 1", len(a2.OnFrameVX))
+	}
+	fv := a2.OnFrameVX[0]
+	if fv.FrameStart != 3 || fv.FrameEnd != 5 || fv.VX != -60 {
+		t.Fatalf("slime attack2 on_frame_vx = %+v", fv)
+	}
+}
