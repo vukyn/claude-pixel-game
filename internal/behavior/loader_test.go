@@ -15,7 +15,7 @@ func TestBuildNodeSelector(t *testing.T) {
 			map[string]any{"type": "action", "name": "stop"},
 		},
 	}
-	n, err := buildNode(raw, "root")
+	n, err := buildNode(raw)
 	if err != nil {
 		t.Fatalf("buildNode: %v", err)
 	}
@@ -36,7 +36,7 @@ func TestBuildNodeChanceTree(t *testing.T) {
 			map[string]any{"weight": 70.0, "node": map[string]any{"type": "action", "name": "stop"}},
 		},
 	}
-	n, err := buildNode(raw, "root")
+	n, err := buildNode(raw)
 	if err != nil {
 		t.Fatalf("buildNode: %v", err)
 	}
@@ -51,7 +51,7 @@ func TestBuildNodeChanceTree(t *testing.T) {
 
 func TestBuildNodeWait(t *testing.T) {
 	raw := map[string]any{"type": "wait", "seconds": 2.5}
-	n, err := buildNode(raw, "root")
+	n, err := buildNode(raw)
 	if err != nil {
 		t.Fatalf("buildNode: %v", err)
 	}
@@ -63,7 +63,7 @@ func TestBuildNodeWait(t *testing.T) {
 
 func TestBuildNodeActionUnknownRejected(t *testing.T) {
 	raw := map[string]any{"type": "action", "name": "nope_nada"}
-	_, err := buildNode(raw, "root")
+	_, err := buildNode(raw)
 	if err == nil || !strings.Contains(err.Error(), "nope_nada") {
 		t.Fatalf("err = %v", err)
 	}
@@ -71,7 +71,7 @@ func TestBuildNodeActionUnknownRejected(t *testing.T) {
 
 func TestBuildNodeConditionUnknownRejected(t *testing.T) {
 	raw := map[string]any{"type": "condition", "name": "nope_nada"}
-	_, err := buildNode(raw, "root")
+	_, err := buildNode(raw)
 	if err == nil || !strings.Contains(err.Error(), "nope_nada") {
 		t.Fatalf("err = %v", err)
 	}
@@ -79,7 +79,7 @@ func TestBuildNodeConditionUnknownRejected(t *testing.T) {
 
 func TestBuildNodeUnknownTypeRejected(t *testing.T) {
 	raw := map[string]any{"type": "spline"}
-	_, err := buildNode(raw, "root")
+	_, err := buildNode(raw)
 	if err == nil || !strings.Contains(err.Error(), "spline") {
 		t.Fatalf("err = %v", err)
 	}
@@ -87,7 +87,7 @@ func TestBuildNodeUnknownTypeRejected(t *testing.T) {
 
 func TestBuildNodeChanceEmptyBranchesRejected(t *testing.T) {
 	raw := map[string]any{"type": "chance", "branches": []any{}}
-	_, err := buildNode(raw, "root")
+	_, err := buildNode(raw)
 	if err == nil || !strings.Contains(err.Error(), "chance") {
 		t.Fatalf("err = %v", err)
 	}
@@ -100,7 +100,7 @@ func TestBuildNodeChanceNonPositiveWeightRejected(t *testing.T) {
 			map[string]any{"weight": 0.0, "node": map[string]any{"type": "action", "name": "stop"}},
 		},
 	}
-	_, err := buildNode(raw, "root")
+	_, err := buildNode(raw)
 	if err == nil || !strings.Contains(err.Error(), "weight") {
 		t.Fatalf("err = %v", err)
 	}
@@ -227,6 +227,42 @@ func TestLoadFileNonDecisionWithBTRejected(t *testing.T) {
     ]}`)
 	_, err := LoadFile(p)
 	if err == nil || !strings.Contains(err.Error(), "must not have bt") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestLoadFileMissingKindRejected(t *testing.T) {
+	p := writeTmp(t, `{"states":[{"id":"run","anim":"run","decision":false,"exit_on":"anim_done","next":"__dead"}]}`)
+	_, err := LoadFile(p)
+	if err == nil || !strings.Contains(err.Error(), "kind") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestLoadFileEmptyStatesRejected(t *testing.T) {
+	p := writeTmp(t, `{"kind":"orc","states":[]}`)
+	_, err := LoadFile(p)
+	if err == nil || !strings.Contains(err.Error(), "states is empty") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestLoadFileNonexistentPathError(t *testing.T) {
+	_, err := LoadFile("/nonexistent/totally-not-there/orc.json")
+	if err == nil {
+		t.Fatal("expected error for nonexistent path")
+	}
+}
+
+func TestBuildNodeChanceFractionalWeightRejected(t *testing.T) {
+	raw := map[string]any{
+		"type": "chance",
+		"branches": []any{
+			map[string]any{"weight": 1.5, "node": map[string]any{"type": "action", "name": "stop"}},
+		},
+	}
+	_, err := buildNode(raw)
+	if err == nil || !strings.Contains(err.Error(), "integer") {
 		t.Fatalf("err = %v", err)
 	}
 }

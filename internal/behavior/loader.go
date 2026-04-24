@@ -13,12 +13,12 @@ import (
 //
 // See assets/behaviors/README.md for the schema.
 func LoadFile(path string) (*File, error) {
-	bytes, err := os.ReadFile(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("behavior: read %s: %w", path, err)
 	}
 	var raw FileRaw
-	if err := json.Unmarshal(bytes, &raw); err != nil {
+	if err := json.Unmarshal(data, &raw); err != nil {
 		return nil, fmt.Errorf("behavior: parse %s: %w", path, err)
 	}
 	return buildFile(&raw, path)
@@ -113,7 +113,7 @@ func buildFile(raw *FileRaw, path string) (*File, error) {
 			ps.OnFrameVX = append(ps.OnFrameVX, FrameVX{FrameStart: fv.FrameStart, FrameEnd: fv.FrameEnd, VX: fv.VX})
 		}
 		if s.Decision {
-			root, err := buildNode(s.BT, s.ID)
+			root, err := buildNode(s.BT)
 			if err != nil {
 				return nil, fmt.Errorf("behavior: %s: state %q: %w", path, s.ID, err)
 			}
@@ -183,17 +183,17 @@ func validateGotos(n Node, ids map[string]bool, path, state string) error {
 	return nil
 }
 
-func buildNode(raw map[string]any, stateID string) (Node, error) {
+func buildNode(raw map[string]any) (Node, error) {
 	t, _ := raw["type"].(string)
 	switch t {
 	case "selector":
-		children, err := buildChildren(raw, stateID)
+		children, err := buildChildren(raw)
 		if err != nil {
 			return nil, err
 		}
 		return &Selector{Children: children}, nil
 	case "sequence":
-		children, err := buildChildren(raw, stateID)
+		children, err := buildChildren(raw)
 		if err != nil {
 			return nil, err
 		}
@@ -210,6 +210,9 @@ func buildNode(raw map[string]any, stateID string) (Node, error) {
 			if err != nil {
 				return nil, fmt.Errorf("chance branch #%d: %w", i, err)
 			}
+			if w != float64(int(w)) {
+				return nil, fmt.Errorf("chance branch #%d: weight must be integer, got %v", i, w)
+			}
 			if w <= 0 {
 				return nil, fmt.Errorf("chance branch #%d: weight must be > 0", i)
 			}
@@ -217,7 +220,7 @@ func buildNode(raw map[string]any, stateID string) (Node, error) {
 			if !ok {
 				return nil, fmt.Errorf("chance branch #%d: missing node", i)
 			}
-			child, err := buildNode(nodeRaw, stateID)
+			child, err := buildNode(nodeRaw)
 			if err != nil {
 				return nil, err
 			}
@@ -248,7 +251,7 @@ func buildNode(raw map[string]any, stateID string) (Node, error) {
 	return nil, fmt.Errorf("unknown node type %q", t)
 }
 
-func buildChildren(raw map[string]any, stateID string) ([]Node, error) {
+func buildChildren(raw map[string]any) ([]Node, error) {
 	arr, _ := raw["children"].([]any)
 	if len(arr) == 0 {
 		return nil, fmt.Errorf("%q has no children", raw["type"])
@@ -256,7 +259,7 @@ func buildChildren(raw map[string]any, stateID string) ([]Node, error) {
 	var out []Node
 	for i, c := range arr {
 		cm, _ := c.(map[string]any)
-		child, err := buildNode(cm, stateID)
+		child, err := buildNode(cm)
 		if err != nil {
 			return nil, fmt.Errorf("child #%d: %w", i, err)
 		}
