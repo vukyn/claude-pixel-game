@@ -7,15 +7,6 @@ import (
 	"claude-pixel/internal/storage"
 )
 
-// AttackMotion describes horizontal displacement applied during a specific
-// frame window of an attack/attack2 state. VX is signed: positive = forward
-// along the facing direction; negative = backward.
-type AttackMotion struct {
-	VX         float64
-	FrameStart int
-	FrameEnd   int
-}
-
 // Kind bundles per-enemy-kind metadata. All animation keys in Anims are
 // unprefixed ("idle", "run", "attack", "attack2", "hurt", "death") so FSM
 // states use static strings regardless of owner.
@@ -27,7 +18,6 @@ type Kind struct {
 	Tuning       *Tuning
 	Boxes        map[string]combat.Box
 	Anims        map[string]*anim.Animation
-	Motions      map[string]AttackMotion
 	States       map[string]*StateDecl
 	InitialState string
 	BehaviorPath string
@@ -40,7 +30,6 @@ type KindConfig struct {
 	FrameH       int
 	AnimLib      map[string]*anim.Animation
 	HitboxSpecs  []combat.HitboxSpec
-	MotionSpecs  []combat.AttackMotionSpec
 	TuneRepo     *storage.Repository[player.TuningParam]
 	RenderScale  int
 	BehaviorPath string
@@ -59,7 +48,6 @@ func BuildKind(cfg KindConfig) (*Kind, error) {
 	if err != nil {
 		return nil, err
 	}
-	motions := MotionsFor(cfg.MotionSpecs, cfg.Name)
 	k := &Kind{
 		Name:         cfg.Name,
 		AnimPrefix:   cfg.Prefix,
@@ -68,7 +56,6 @@ func BuildKind(cfg KindConfig) (*Kind, error) {
 		Tuning:       tuning,
 		Boxes:        boxes,
 		Anims:        anims,
-		Motions:      motions,
 		BehaviorPath: cfg.BehaviorPath,
 	}
 	if cfg.BehaviorPath != "" {

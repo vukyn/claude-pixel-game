@@ -77,31 +77,6 @@ func TestBoxesForMissingBody(t *testing.T) {
 	}
 }
 
-func TestMotionsForFiltersByOwner(t *testing.T) {
-	specs := []combat.AttackMotionSpec{
-		{ID: "slime_attack2_motion", Owner: "slime", Kind: "attack2", VX: -60, FrameStart: 3, FrameEnd: 5},
-		{ID: "orc_attack_motion", Owner: "orc", Kind: "attack", VX: 30, FrameStart: 1, FrameEnd: 2},
-	}
-	out := MotionsFor(specs, "slime")
-	if len(out) != 1 {
-		t.Fatalf("want 1 motion, got %d", len(out))
-	}
-	m, ok := out["attack2"]
-	if !ok {
-		t.Fatalf("missing attack2")
-	}
-	if m.VX != -60 || m.FrameStart != 3 || m.FrameEnd != 5 {
-		t.Errorf("wrong motion: %+v", m)
-	}
-}
-
-func TestMotionsForEmptyWhenNoMatch(t *testing.T) {
-	out := MotionsFor(nil, "orc")
-	if len(out) != 0 {
-		t.Errorf("want empty, got %d", len(out))
-	}
-}
-
 func TestLoadTuningForPoints(t *testing.T) {
 	cfg := &config.Config{DBPath: ":memory:"}
 	db, err := storage.Open(cfg)

@@ -41,15 +41,3 @@ func BoxesFor(specs []combat.HitboxSpec, owner string, scale int) (map[string]co
 	return out, nil
 }
 
-// MotionsFor filters AttackMotionSpec list by owner and returns a map keyed
-// by kind ("attack" | "attack2"). Empty map (not error) if owner has none.
-func MotionsFor(specs []combat.AttackMotionSpec, owner string) map[string]AttackMotion {
-	out := map[string]AttackMotion{}
-	for _, s := range specs {
-		if s.Owner != owner {
-			continue
-		}
-		out[s.Kind] = AttackMotion{VX: s.VX, FrameStart: s.FrameStart, FrameEnd: s.FrameEnd}
-	}
-	return out
-}

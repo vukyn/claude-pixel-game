@@ -26,7 +26,6 @@ func main() {
 	animRepo := storage.NewRepository[anim.AnimationSpec](db, anim.SpecMapper{})
 	tuneRepo := storage.NewRepository[player.TuningParam](db, player.TuningMapper{})
 	hitboxRepo := storage.NewRepository[combat.HitboxSpec](db, combat.HitboxMapper{})
-	motionRepo := storage.NewRepository[combat.AttackMotionSpec](db, combat.AttackMotionMapper{})
 
 	anims, err := anim.LoadLibrary(cfg, animRepo)
 	if err != nil {
@@ -69,10 +68,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("list hitboxes: %v", err)
 	}
-	motionSpecs, err := motionRepo.List(context.Background())
-	if err != nil {
-		log.Fatalf("list attack_motions: %v", err)
-	}
 
 	soldierBoxes, err := combat.SoldierBoxes(hitboxSpecs, cfg.RenderScale)
 	if err != nil {
@@ -81,7 +76,7 @@ func main() {
 
 	orcKind, err := enemy.BuildKind(enemy.KindConfig{
 		Name: "orc", Prefix: "orc", FrameW: 100, FrameH: 100,
-		AnimLib: anims, HitboxSpecs: hitboxSpecs, MotionSpecs: motionSpecs,
+		AnimLib: anims, HitboxSpecs: hitboxSpecs,
 		TuneRepo: tuneRepo, RenderScale: cfg.RenderScale,
 		BehaviorPath: cfg.AssetsDir + "/behaviors/orc.json",
 	})
@@ -91,7 +86,7 @@ func main() {
 
 	slimeKind, err := enemy.BuildKind(enemy.KindConfig{
 		Name: "slime", Prefix: "slime", FrameW: 96, FrameH: 96,
-		AnimLib: anims, HitboxSpecs: hitboxSpecs, MotionSpecs: motionSpecs,
+		AnimLib: anims, HitboxSpecs: hitboxSpecs,
 		TuneRepo: tuneRepo, RenderScale: cfg.RenderScale,
 		BehaviorPath: cfg.AssetsDir + "/behaviors/slime.json",
 	})

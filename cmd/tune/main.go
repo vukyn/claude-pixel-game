@@ -23,17 +23,15 @@ func main() {
 
 	tuneRepo := storage.NewRepository[player.TuningParam](db, player.TuningMapper{})
 	hbRepo := storage.NewRepository[combat.HitboxSpec](db, combat.HitboxMapper{})
-	mvRepo := storage.NewRepository[combat.AttackMotionSpec](db, combat.AttackMotionMapper{})
 	hudRepo := storage.NewRepository[hud.LayoutRow](db, hud.LayoutMapper{})
 
 	app := &cli.Command{
 		Name:  "claude-pixel-tune",
-		Usage: "Manage tuning + hitbox + attack-motion rows stored in SQLite",
+		Usage: "Manage tuning + hitbox rows stored in SQLite",
 		Commands: []*cli.Command{
 			tuningListCmd(tuneRepo),
 			tuningSetCmd(tuneRepo),
 			hitboxesCmd(hbRepo),
-			motionsCmd(mvRepo),
 			hudCmd(hudRepo),
 		},
 	}
@@ -293,167 +291,6 @@ func applyHitboxField(h *combat.HitboxSpec, field, raw string) error {
 		h.FrameEnd = n
 	default:
 		return fmt.Errorf("unknown field %q (valid: owner, kind, offset_x, offset_y, width, height, active_frame_start, active_frame_end)", field)
-	}
-	return nil
-}
-
-func motionsCmd(repo *storage.Repository[combat.AttackMotionSpec]) *cli.Command {
-	return &cli.Command{
-		Name:  "motions",
-		Usage: "CRUD operations on the attack_motions table",
-		Commands: []*cli.Command{
-			{
-				Name:  "list",
-				Usage: "List every attack-motion row",
-				Action: func(ctx context.Context, c *cli.Command) error {
-					rows, err := repo.List(ctx)
-					if err != nil {
-						return err
-					}
-					w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-					fmt.Fprintln(w, "ID\tOWNER\tKIND\tVX\tFRAME_START\tFRAME_END")
-					for _, m := range rows {
-						fmt.Fprintf(w, "%s\t%s\t%s\t%.2f\t%d\t%d\n",
-							m.ID, m.Owner, m.Kind, m.VX, m.FrameStart, m.FrameEnd)
-					}
-					return w.Flush()
-				},
-			},
-			{
-				Name:      "get",
-				Usage:     "Show one attack-motion row by id",
-				ArgsUsage: "<id>",
-				Action: func(ctx context.Context, c *cli.Command) error {
-					if c.Args().Len() != 1 {
-						return fmt.Errorf("usage: tune motions get <id>")
-					}
-					id := c.Args().Get(0)
-					m, err := repo.Get(ctx, id)
-					if err != nil {
-						return fmt.Errorf("unknown motion id %q", id)
-					}
-					fmt.Printf("id=%s owner=%s kind=%s vx=%.2f frame_start=%d frame_end=%d\n",
-						m.ID, m.Owner, m.Kind, m.VX, m.FrameStart, m.FrameEnd)
-					return nil
-				},
-			},
-			{
-				Name:        "set",
-				Usage:       "Update one field of an existing attack-motion row",
-				ArgsUsage:   "<id> <field> <value>",
-				Description: "Valid fields: owner, kind, vx, frame_start, frame_end",
-				Action: func(ctx context.Context, c *cli.Command) error {
-					if c.Args().Len() != 3 {
-						return fmt.Errorf("usage: tune motions set <id> <field> <value>")
-					}
-					id := c.Args().Get(0)
-					field := c.Args().Get(1)
-					raw := c.Args().Get(2)
-
-					m, err := repo.Get(ctx, id)
-					if err != nil {
-						return fmt.Errorf("unknown motion id %q", id)
-					}
-					before := formatMotion(m)
-					if err := applyMotionField(&m, field, raw); err != nil {
-						return err
-					}
-					if err := repo.Upsert(ctx, m); err != nil {
-						return err
-					}
-					fmt.Printf("OK: %s.%s updated\n  was: %s\n  now: %s\n", id, field, before, formatMotion(m))
-					return nil
-				},
-			},
-			{
-				Name:      "add",
-				Usage:     "Insert (upsert) an attack-motion row",
-				ArgsUsage: "<id> <owner> <kind> <vx> <frame_start> <frame_end>",
-				Action: func(ctx context.Context, c *cli.Command) error {
-					if c.Args().Len() != 6 {
-						return fmt.Errorf("usage: tune motions add <id> <owner> <kind> <vx> <fs> <fe>")
-					}
-					m := combat.AttackMotionSpec{
-						ID:    c.Args().Get(0),
-						Owner: c.Args().Get(1),
-						Kind:  c.Args().Get(2),
-					}
-					vx, err := strconv.ParseFloat(c.Args().Get(3), 64)
-					if err != nil {
-						return fmt.Errorf("vx=%q is not a number", c.Args().Get(3))
-					}
-					m.VX = vx
-					fs, err := strconv.Atoi(c.Args().Get(4))
-					if err != nil {
-						return fmt.Errorf("frame_start=%q is not an integer", c.Args().Get(4))
-					}
-					m.FrameStart = fs
-					fe, err := strconv.Atoi(c.Args().Get(5))
-					if err != nil {
-						return fmt.Errorf("frame_end=%q is not an integer", c.Args().Get(5))
-					}
-					m.FrameEnd = fe
-					if err := repo.Upsert(ctx, m); err != nil {
-						return err
-					}
-					fmt.Printf("OK: added/updated %s\n", m.ID)
-					return nil
-				},
-			},
-			{
-				Name:      "delete",
-				Usage:     "Delete an attack-motion row by id",
-				ArgsUsage: "<id>",
-				Action: func(ctx context.Context, c *cli.Command) error {
-					if c.Args().Len() != 1 {
-						return fmt.Errorf("usage: tune motions delete <id>")
-					}
-					id := c.Args().Get(0)
-					if _, err := repo.Get(ctx, id); err != nil {
-						return fmt.Errorf("unknown motion id %q", id)
-					}
-					if err := repo.Delete(ctx, id); err != nil {
-						return err
-					}
-					fmt.Printf("OK: deleted %s\n", id)
-					return nil
-				},
-			},
-		},
-	}
-}
-
-func formatMotion(m combat.AttackMotionSpec) string {
-	return fmt.Sprintf("owner=%s kind=%s vx=%.2f frames=[%d,%d]",
-		m.Owner, m.Kind, m.VX, m.FrameStart, m.FrameEnd)
-}
-
-func applyMotionField(m *combat.AttackMotionSpec, field, raw string) error {
-	switch field {
-	case "owner":
-		m.Owner = raw
-	case "kind":
-		m.Kind = raw
-	case "vx":
-		v, err := strconv.ParseFloat(raw, 64)
-		if err != nil {
-			return fmt.Errorf("value %q is not a number", raw)
-		}
-		m.VX = v
-	case "frame_start":
-		n, err := strconv.Atoi(raw)
-		if err != nil {
-			return fmt.Errorf("value %q is not an integer", raw)
-		}
-		m.FrameStart = n
-	case "frame_end":
-		n, err := strconv.Atoi(raw)
-		if err != nil {
-			return fmt.Errorf("value %q is not an integer", raw)
-		}
-		m.FrameEnd = n
-	default:
-		return fmt.Errorf("unknown field %q (valid: owner, kind, vx, frame_start, frame_end)", field)
 	}
 	return nil
 }
