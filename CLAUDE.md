@@ -3,6 +3,7 @@
 Notes for future Claude sessions. Designs/plans:
 - `docs/superpowers/specs/2026-04-21-char1-controller-design.md` + plan
 - `docs/superpowers/specs/2026-04-23-combat-and-enemy-design.md` + plan
+- `docs/superpowers/specs/2026-04-24-enemy-behavior-json-design.md` + plan
 
 ## Layout
 
@@ -16,8 +17,9 @@ internal/
   config/              # godotenv loader (panics on missing env)
   storage/             # sqlite Open + migrations/*.sql + Repository[T]; includes hud_layout table
   anim/                # AnimationSpec (per-spec frame dims + path + grid), sheet slicer, LoadLibrary
-  combat/              # Box + HitboxSpec mapper, Fighter, Resolve, Tuning, AttackMotionSpec (motion.go)
-  enemy/               # Enemy + Kind (kind.go) with AnimPrefix/FrameW/FrameH/Tuning/Boxes/Anims/Motions; FSM (fall/run/attack/attack2/hurt/death), generic AnimsFor/BoxesFor/MotionsFor (loader.go), LoadTuningFor, LoadSpawnTuning
+  combat/              # Box + HitboxSpec mapper, Fighter, Resolve, Tuning
+  behavior/            # JSON-driven BT runtime: Node/Tree/Ctx, Selector/Sequence/Chance/Wait/Action/Condition, action+condition registry, loader+validator
+  enemy/               # Enemy + Kind (kind.go) with AnimPrefix/FrameW/FrameH/Tuning/Boxes/Anims/States/InitialState/BehaviorPath; generic (*Enemy).Tick driver delegates to Kind.States BT; AnimsFor/BoxesFor/LoadBehavior/LoadTuningFor/LoadSpawnTuning/ReloadBehavior
   spawner/             # timer + interval roll + cap enforcement
   stamina/             # stamina pool; drain while sprinting, regen while not; gates sprint
   score/               # score accumulator; incremented on enemy kill by kind-specific points value
@@ -136,6 +138,7 @@ Toggle **F3** in-game. Layout `config/debug.json` — edit, restart. Unknown fie
 | Attack2 | `K` or `C` (edge) |
 | Debug overlay | `F3` (edge) |
 | Hitbox debug | `F4` (edge) |
+| Reload behavior JSON | `F5` (edge) |
 | Pause | `Esc` (edge) |
 | Resume (while paused) | Any key (edge, action swallowed that tick) |
 | Restart (on GAME OVER) | `R` (edge) |
@@ -146,9 +149,9 @@ Shift alone = no-op. No double-jump. Attacks cancelable by Jump only (grounded).
 
 **Soldier** (8 states): `Idle`, `Run`, `Jump`, `Fall`, `Attack`, `Attack2`, `Hit`, `Death`. `Hit` = bounced back + airborne i-frame until grounded. `Death` = 10 lives consumed, terminal. Sprint is gated by stamina — depletes while sprinting, regenerates otherwise.
 
-**Orc** (6 states): `Fall` (from spawn), `Run`, `Attack`, `Attack2`, `Hurt`, `Death`. Every `orc_intent_tick_s`, Run either stays or 50/50 picks `Attack`/`Attack2`. 2 lives — second hit kills. Hurt anim = i-frame window. `internal/enemy/states.go`.
+**Orc** (6 states): `Fall` (from spawn), `Run`, `Attack`, `Attack2`, `Hurt`, `Death`. State list + decision tree (what to do while running) comes from `assets/behaviors/orc.json`. Run state reroll every 2 s: 50% attack (50/50 attack1/attack2), 50% flip/stop (50/50). 2 lives — second hit kills. Hurt anim = i-frame window.
 
-**Slime** (6 states): identical FSM to orc — `Fall` → `Run` → `Attack`/`Attack2` → `Hurt`/`Death`, using `slime_intent_tick_s`. Attack2 applies a backward VX slide on frames 3–5 (configurable via `attack_motions` table → row `slime_attack2_motion`).
+**Slime** (6 states): identical FSM shape to orc, `assets/behaviors/slime.json`. Run speed 60 (vs orc 80). Attack2 applies a backward VX=-60 slide on frames 3–5 via the per-state `on_frame_vx` declaration in JSON.
 
 ## Combat + hitboxes
 
@@ -156,7 +159,19 @@ Hitbox table seeded by migration 012. Each fighter has a body box (always-on) an
 
 Hitbox dims stored in `hitboxes` table (not in `tuning`). Retune via new migration.
 
-**Attack motions** (`attack_motions` table, migration 019) optionally apply a per-frame-window VX slide during an attack state. VX is signed: positive = forward along facing, negative = backward. Seeded for slime Attack2 only (`slime_attack2_motion`: vx=-60, frames 3–5). Retune via `tune motions set <id> <field> <value>`. Orcs have no motion rows; their attacks keep VX=0.
+## Behavior JSON
+
+Per-kind state list + decision trees live in `assets/behaviors/<kind>.json`. Runtime: `internal/behavior/` (Node/Tree/Ctx, Selector/Sequence/Chance/Wait/Action/Condition, loader + validator + action/condition registry). See `assets/behaviors/README.md` for the schema + v1 built-in actions/conditions.
+
+Each state declares `id`, `anim`, `decision`, optional `bt` (for decision states), `exit_on`, `next`, `on_exit_actions`, `on_frame_vx`. Engine-owned event transitions (hit → hurt, lives=0 → death, fall → run on grounded) bypass the BT. Decision states run their BT each tick; non-decision states run per-frame VX + exit on `exit_on` rule → `on_exit_actions` → transition to `next`.
+
+Per-frame attack VX (replaces old `attack_motions` SQLite table) lives on the state decl as `on_frame_vx: [{frame_start, frame_end, vx}]`. Slime `attack2` has `vx=-60, frames 3-5`.
+
+Press **F5** in-game to re-parse all behavior JSON. Parse failure logs + retains old tree. Live enemies keep their original cloned BT until they despawn; new spawns pick up the reload.
+
+## Migrations
+
+Per user preference in memory: schema → edit `001_init_schema.sql` in place; seed → edit `002_seed_data.sql` in place. Never create `003_*.sql`. User wipes `data/` between test runs.
 
 ## Spawner
 
@@ -165,10 +180,6 @@ Hitbox dims stored in `hitboxes` table (not in `tuning`). Retune via new migrati
 ## HUD + font
 
 Heart anim from `assets/huds/healthbar/heartbeat.png` (row 3 of 4×6 grid, 4 frames, 400ms loop) + monogram-font `xN` lives counter. Stamina bar drawn from `assets/huds/healthbar/healthbar.png`. Score text shown top-left. Element positions loaded from `hud_layout` table via `internal/hud/layout.go`. GAME OVER overlay (dim + "GAME OVER" @96 + "Press R to restart" @32) on soldier death. Pause overlay (dim + "PAUSED" + "Press any key to resume") on `ModePaused`. Font loaded from `FONT_PATH` env (`./assets/fonts/monogram/ttf/monogram.ttf`) via `text/v2`.
-
-## Migrations
-
-`internal/storage/migrations/*.sql` embedded via `//go:embed`, applied in order by `internal/storage/migrations.go`. Tracked in `schema_migrations`. Never edit applied migration — add new numbered file.
 
 ## Tests
 
