@@ -123,7 +123,7 @@ For text elements, stored `w/h=0` → width is measured at draw time.
 
 ## Debug overlay
 
-Toggle **F3** in-game. Layout `config/debug.json` — edit, restart. Unknown field keys = boot-time error listing valid keys. Catalog: `internal/debug/fields.go` (23 fields: 19 player/engine + 4 orc/lives). **F4** toggles hitbox debug draw (green = body, red = active attack box).
+Toggle **F3** in-game. Layout `config/debug.json` — edit, restart. Unknown field keys = boot-time error listing valid keys. Catalog: `internal/debug/fields.go` (25 fields: 19 player/engine + 4 orc/lives + 2 behavior). **F4** toggles hitbox debug draw (green = body, red = active attack box).
 
 ## Controls
 

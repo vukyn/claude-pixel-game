@@ -3,6 +3,7 @@ package game
 import (
 	"image/color"
 	"log"
+	"math"
 	"math/rand"
 	"sort"
 	"time"
@@ -173,6 +174,42 @@ func (g *Game) EngineFPS() float64     { return ebiten.ActualFPS() }
 func (g *Game) EngineTPS() float64     { return ebiten.ActualTPS() }
 func (g *Game) EnemyCount() int        { return len(g.enemies) }
 func (g *Game) NextSpawnS() float64    { return g.spawner.NextSpawnS() }
+
+func (g *Game) NearestEnemyState() string {
+	e := g.nearestEnemy()
+	if e == nil {
+		return "(none)"
+	}
+	return e.CurrentState
+}
+
+func (g *Game) NearestEnemyBranch() string {
+	e := g.nearestEnemy()
+	if e == nil {
+		return ""
+	}
+	return e.BranchTag
+}
+
+func (g *Game) nearestEnemy() *enemy.Enemy {
+	if len(g.enemies) == 0 {
+		return nil
+	}
+	px := g.player.X
+	var best *enemy.Enemy
+	bestD := math.MaxFloat64
+	for _, e := range g.enemies {
+		d := e.X - px
+		if d < 0 {
+			d = -d
+		}
+		if d < bestD {
+			bestD = d
+			best = e
+		}
+	}
+	return best
+}
 
 func (g *Game) Layout(outerW, outerH int) (int, int) { return g.cfg.WindowW, g.cfg.WindowH }
 
