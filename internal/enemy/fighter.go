@@ -34,12 +34,11 @@ func (e *Enemy) ActiveHits() []combat.Box {
 }
 
 func (e *Enemy) IsInvulnerable() bool {
-	id := e.FSM.CurrentID()
-	return id == StateHurt || id == StateDeath
+	return e.CurrentState == "hurt" || e.CurrentState == "death"
 }
 
 func (e *Enemy) Alive() bool {
-	return !e.Dead && e.FSM.CurrentID() != StateDeath
+	return !e.Dead && e.CurrentState != "death"
 }
 
 func (e *Enemy) AlreadyHit(t combat.Fighter) bool {

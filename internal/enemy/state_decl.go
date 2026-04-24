@@ -22,6 +22,20 @@ type StateDecl struct {
 	OnFrameVX     []behavior.FrameVX
 }
 
+// CloneStates returns a copy of decls where each decision state has an
+// independent BT. Non-decision states are shallow-copied (no runtime state).
+func CloneStates(decls map[string]*StateDecl) map[string]*StateDecl {
+	out := make(map[string]*StateDecl, len(decls))
+	for id, d := range decls {
+		cp := *d
+		if d.BT != nil {
+			cp.BT = behavior.CloneTree(d.BT)
+		}
+		out[id] = &cp
+	}
+	return out
+}
+
 // ConvertStates turns the generic behavior.State list into enemy StateDecls
 // keyed by ID. Fails if an anim key is not present in lib.
 func ConvertStates(bStates []behavior.State, lib map[string]*anim.Animation) (map[string]*StateDecl, error) {

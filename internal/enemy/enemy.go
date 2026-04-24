@@ -19,18 +19,20 @@ type Config struct {
 
 type Enemy struct {
 	X, Y, VX, VY float64
-	Facing       int
-	Grounded     bool
-	Lives        int
-	Physics      *player.Physics
-	Kind         *Kind
-	FSM          *FSM
-	Current      *anim.Animation
-	CurrentAnim  string
-	IntentTimer  float64
-	HitSet       map[combat.Fighter]bool
-	Dead         bool
-	rng          *rand.Rand
+	Facing        int
+	Grounded      bool
+	Lives         int
+	Physics       *player.Physics
+	Kind          *Kind
+	Current       *anim.Animation
+	CurrentAnim   string
+	CurrentState  string
+	BranchTag     string
+	HitSet        map[combat.Fighter]bool
+	Dead          bool
+	OnHitPending  bool
+	states        map[string]*StateDecl
+	rng           *rand.Rand
 }
 
 func New(cfg Config) *Enemy {
@@ -44,14 +46,13 @@ func New(cfg Config) *Enemy {
 		HitSet:  map[combat.Fighter]bool{},
 		rng:     cfg.RNG,
 	}
-	e.FSM = NewFSM(StateFall)
-	e.FSM.Register(&fallState{})
-	e.FSM.Register(&runState{})
-	e.FSM.Register(&attackState{})
-	e.FSM.Register(&attack2State{})
-	e.FSM.Register(&hurtState{})
-	e.FSM.Register(&deathState{})
-	e.FSM.Start(e)
+	e.states = CloneStates(cfg.Kind.States)
+	e.CurrentState = cfg.Kind.InitialState
+	if st := e.states[e.CurrentState]; st != nil && st.Anim != nil {
+		st.Anim.Reset()
+		e.Current = st.Anim
+		e.CurrentAnim = st.AnimKey
+	}
 	return e
 }
 
@@ -82,10 +83,13 @@ func (e *Enemy) ApplyPhysics(w *world.World, dt time.Duration) {
 	}
 }
 
+// OnHit is called by combat resolution. Decrements lives, applies knockback,
+// marks a pending Hurt transition. The FSM driver picks up OnHitPending on
+// the next Tick and bypasses the BT. When lives hit 0, the hurt transition
+// is skipped so the driver can route directly to death on the next Tick.
 func (e *Enemy) OnHit(attackerX float64) {
 	e.Lives--
 	if e.Lives <= 0 {
-		e.FSM.Transition(e, StateDeath)
 		return
 	}
 	dir := 1.0
@@ -95,5 +99,5 @@ func (e *Enemy) OnHit(attackerX float64) {
 	e.VX = dir * e.Kind.Tuning.HurtBounceVX
 	e.VY = e.Kind.Tuning.HurtBounceVY
 	e.Grounded = false
-	e.FSM.Transition(e, StateHurt)
+	e.OnHitPending = true
 }

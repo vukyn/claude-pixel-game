@@ -51,3 +51,27 @@ func TestCtxSetBranchAppends(t *testing.T) {
 		t.Fatalf("BranchTag = %q, want %q", got, want)
 	}
 }
+
+func TestCloneTreeIsolatesWaitState(t *testing.T) {
+	src := &Tree{Root: &Wait{Seconds: 1.0}}
+	a := CloneTree(src)
+	b := CloneTree(src)
+	ctx := &Ctx{DT: 600 * time.Millisecond}
+	a.Root.Tick(ctx) // a.elapsed = 0.6
+	a.Root.Tick(ctx) // a.elapsed = 1.2 → Success, reset to 0
+	bCtx := &Ctx{DT: 100 * time.Millisecond}
+	if got := b.Root.Tick(bCtx); got != StatusRunning {
+		t.Fatalf("clone b shouldn't have inherited elapsed time: got %v", got)
+	}
+}
+
+func TestCloneTreePreservesChanceBranches(t *testing.T) {
+	src := &Tree{Root: &Chance{Branches: []ChanceBranch{
+		{Weight: 1, Node: &Action{Name: "stop"}},
+	}}}
+	c := CloneTree(src)
+	ch := c.Root.(*Chance)
+	if len(ch.Branches) != 1 {
+		t.Fatalf("branches = %d", len(ch.Branches))
+	}
+}

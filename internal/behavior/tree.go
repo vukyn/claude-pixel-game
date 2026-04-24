@@ -57,3 +57,42 @@ func (c *Ctx) SetBranch(seg string) {
 	}
 	c.BranchTag += "/" + seg
 }
+
+// CloneTree deep-clones t so per-node runtime state (Wait elapsed, Chance
+// active branch) is independent of other users of the same source tree.
+func CloneTree(t *Tree) *Tree {
+	if t == nil || t.Root == nil {
+		return &Tree{}
+	}
+	return &Tree{Root: cloneNode(t.Root)}
+}
+
+func cloneNode(n Node) Node {
+	switch v := n.(type) {
+	case *Selector:
+		out := &Selector{Children: make([]Node, len(v.Children))}
+		for i, c := range v.Children {
+			out.Children[i] = cloneNode(c)
+		}
+		return out
+	case *Sequence:
+		out := &Sequence{Children: make([]Node, len(v.Children))}
+		for i, c := range v.Children {
+			out.Children[i] = cloneNode(c)
+		}
+		return out
+	case *Chance:
+		out := &Chance{Branches: make([]ChanceBranch, len(v.Branches))}
+		for i, b := range v.Branches {
+			out.Branches[i] = ChanceBranch{Weight: b.Weight, Node: cloneNode(b.Node)}
+		}
+		return out
+	case *Wait:
+		return &Wait{Seconds: v.Seconds}
+	case *Action:
+		return &Action{Name: v.Name, Args: v.Args}
+	case *Condition:
+		return &Condition{Name: v.Name, Args: v.Args}
+	}
+	return n
+}

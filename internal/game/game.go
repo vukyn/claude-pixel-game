@@ -217,7 +217,7 @@ func (g *Game) Update() error {
 
 	g.player.FSM.Handle(g.player, g.lastIntent, dt)
 	for _, e := range g.enemies {
-		e.FSM.Handle(e, dt)
+		e.Tick(dt)
 	}
 
 	g.player.ApplyPhysics(g.world, dt)
@@ -233,7 +233,7 @@ func (g *Game) Update() error {
 		leftLimit := bodyHalfW
 		rightLimit := float64(g.cfg.WindowW) - bodyHalfW
 		clamped := world.Clamp(e.X, leftLimit, rightLimit)
-		if clamped != e.X && e.FSM.CurrentID() == enemy.StateRun {
+		if clamped != e.X && e.CurrentState == "run" {
 			if e.X <= leftLimit {
 				e.Facing = 1
 			} else {
@@ -247,7 +247,7 @@ func (g *Game) Update() error {
 		g.player.Current.Update(dt)
 	}
 	for _, e := range g.enemies {
-		if e.Current != nil && e.FSM.CurrentID() != enemy.StateFall {
+		if e.Current != nil && e.CurrentState != "fall" {
 			e.Current.Update(dt)
 		}
 	}
