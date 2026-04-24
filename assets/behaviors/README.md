@@ -55,3 +55,7 @@ design rationale.
 
 Boot reads every file once. Press **F5** in-game to re-parse. On parse
 failure, the old tree is retained and an error is logged.
+
+Note: F5 swaps the source tree on `*Kind`. Existing live enemies keep their
+original cloned tree until they despawn. Respawn to see changes apply to
+everything.

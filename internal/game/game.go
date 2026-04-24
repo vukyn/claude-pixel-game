@@ -2,6 +2,7 @@ package game
 
 import (
 	"image/color"
+	"log"
 	"math/rand"
 	"sort"
 	"time"
@@ -66,6 +67,7 @@ type Game struct {
 	lastIntent        input.Intent
 	combatTuning      *combat.Tuning
 	kinds             []*enemy.Kind
+	anims             map[string]*anim.Animation
 	physics           *player.Physics
 	staminaTuning     *player.StaminaTuning
 	rng               *rand.Rand
@@ -110,6 +112,7 @@ func New(d Deps) *Game {
 		player:        p,
 		combatTuning:  d.CombatTuning,
 		kinds:         d.EnemyKinds,
+		anims:         d.Anims,
 		physics:       d.Physics,
 		staminaTuning: d.StaminaTuning,
 		rng:           rng,
@@ -179,6 +182,13 @@ func (g *Game) Update() error {
 	}
 	if inpututil.IsKeyJustPressed(ebiten.KeyF4) {
 		g.hitboxDebug = !g.hitboxDebug
+	}
+	if inpututil.IsKeyJustPressed(ebiten.KeyF5) {
+		for _, k := range g.kinds {
+			if err := enemy.ReloadBehavior(k, g.anims); err != nil {
+				log.Printf("behavior reload failed for %q: %v", k.Name, err)
+			}
+		}
 	}
 
 	if g.mode == ModeGameOver {
