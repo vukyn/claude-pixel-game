@@ -67,6 +67,9 @@ func pickWeighted(rng *rand.Rand, branches []ChanceBranch) int {
 			total += b.Weight
 		}
 	}
+	if total == 0 {
+		return len(branches) - 1
+	}
 	r := rng.Intn(total)
 	for i, b := range branches {
 		if b.Weight <= 0 {

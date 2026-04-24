@@ -111,17 +111,42 @@ func TestChanceStickyWhileRunning(t *testing.T) {
 		{Weight: 1, Node: other},
 	}}
 	ctx := &Ctx{RNG: rand.New(rand.NewSource(1))}
+	// First tick rolls; branch 0 (running) selected — weight 100 vs 1.
 	ch.Tick(ctx)
 	ch.Tick(ctx)
-	if running.called != 2 {
-		t.Fatalf("running.called = %d, want 2", running.called)
+	if running.called != 2 || other.called != 0 {
+		t.Fatalf("sticky tick2: running=%d other=%d, want 2,0", running.called, other.called)
 	}
-	// After Success, next Tick should re-roll.
+	// Flip to Success; this tick resolves and clears active.
 	running.out = StatusSuccess
-	ch.Tick(ctx) // resolves running branch as success
-	ch.Tick(ctx) // new roll
-	if running.called+other.called < 3 {
-		t.Fatalf("expected a reroll after Success")
+	ch.Tick(ctx)
+	if running.called != 3 {
+		t.Fatalf("after resolve: running.called=%d, want 3", running.called)
+	}
+	// Next tick re-rolls — with weights 100/1 and the running seed, running
+	// is overwhelmingly likely to be picked again. Key check: ONE of them
+	// was called, i.e., a new Tick fired on a freshly-picked branch.
+	before := running.called + other.called
+	ch.Tick(ctx)
+	if running.called+other.called != before+1 {
+		t.Fatalf("expected reroll to tick exactly one branch; diff=%d",
+			running.called+other.called-before)
+	}
+}
+
+func TestChanceAllZeroWeightsDoesNotPanic(t *testing.T) {
+	node := &fakeNode{out: StatusSuccess}
+	ch := &Chance{Branches: []ChanceBranch{
+		{Weight: 0, Node: node},
+	}}
+	ctx := &Ctx{RNG: rand.New(rand.NewSource(1))}
+	// Must not panic; guard returns len(branches)-1 = 0, so node is ticked.
+	got := ch.Tick(ctx)
+	if got != StatusSuccess {
+		t.Fatalf("Tick = %v, want success", got)
+	}
+	if node.called != 1 {
+		t.Fatalf("node.called = %d, want 1", node.called)
 	}
 }
 
