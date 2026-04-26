@@ -1,4 +1,4 @@
-.PHONY: run tune tidy test
+.PHONY: run tune tidy test editor
 
 run:
 	go run ./cmd/game
@@ -11,4 +11,7 @@ tidy:
 
 test:
 	go test ./...
+
+editor:
+	go run ./cmd/editor
 	
