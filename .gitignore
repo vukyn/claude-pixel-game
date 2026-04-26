@@ -24,3 +24,5 @@ venv/
 
 # Binaries
 *.exe
+/tune
+/game
