@@ -1,10 +1,20 @@
 package debug
 
 import (
+	"image/color"
 	"strings"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
+	"github.com/hajimehoshi/ebiten/v2/vector"
+)
+
+const (
+	debugCharW   = 6
+	debugLineH   = 16
+	debugPadding = 4
+	debugOriginX = 8
+	debugOriginY = 8
 )
 
 type Overlay struct {
@@ -38,5 +48,21 @@ func (o *Overlay) Draw(screen *ebiten.Image) {
 			b.WriteString("\n")
 		}
 	}
-	ebitenutil.DebugPrintAt(screen, b.String(), 8, 8)
+	body := b.String()
+
+	maxLine, lines := 0, 0
+	for _, ln := range strings.Split(body, "\n") {
+		lines++
+		if n := len(ln); n > maxLine {
+			maxLine = n
+		}
+	}
+	bgW := float32(maxLine*debugCharW + debugPadding*2)
+	bgH := float32(lines*debugLineH + debugPadding*2)
+	vector.DrawFilledRect(screen,
+		float32(debugOriginX-debugPadding), float32(debugOriginY-debugPadding),
+		bgW, bgH,
+		color.RGBA{0, 0, 0, 160}, false)
+
+	ebitenutil.DebugPrintAt(screen, body, debugOriginX, debugOriginY)
 }
