@@ -66,19 +66,15 @@ INSERT INTO tuning (key, value, min_value, max_value, unit, description) VALUES
 
     -- orc
     ('orc_max_lives',          2,    1,  10, '',     'starting orc lives'),
-    ('orc_run_speed',         80,    0, 500, 'px/s', 'orc ground speed'),
     ('orc_hurt_bounce_vx',   120,    0, 500, 'px/s', 'horizontal bounce away from attacker when orc is hurt'),
     ('orc_hurt_bounce_vy',  -180, -500,   0, 'px/s', 'vertical pop applied on orc hurt'),
-    ('orc_intent_tick_s',      2,  0.5,  10, 's',    'orc intent reroll period'),
     ('orc_foot_padding',      43,    0, 100, 'px',   'transparent px at orc sprite frame bottom (pre-render scale)'),
     ('orc_points',            10,    0,1000, '',     'points awarded when orc killed'),
 
     -- slime
     ('slime_max_lives',         2,    1,  10, '',     'starting slime lives'),
-    ('slime_run_speed',        60,    0, 500, 'px/s', 'slime ground speed'),
     ('slime_hurt_bounce_vx',  120,    0, 500, 'px/s', 'slime hurt horizontal bounce'),
     ('slime_hurt_bounce_vy', -180, -500,   0, 'px/s', 'slime hurt vertical pop'),
-    ('slime_intent_tick_s',     2,  0.5,  10, 's',    'slime intent reroll period'),
     ('slime_foot_padding',     39,    0,  96, 'px',   'transparent px at slime sprite frame bottom'),
     ('slime_points',           15,    0,1000, '',    'points awarded when slime killed'),
 
@@ -103,13 +99,6 @@ VALUES
     ('slime_body',      'slime',   'body',     -8, -11, 14, 11, -1, -1),
     ('slime_attack',    'slime',   'attack',   12, -15, 15, 15,  4,  5),
     ('slime_attack2',   'slime',   'attack2',  15, -15, 15, 15,  3,  5);
-
--- ============================================================================
--- attack_motions
--- ============================================================================
-
-INSERT INTO attack_motions (id, owner, kind, vx, frame_start, frame_end) VALUES
-    ('slime_attack2_motion', 'slime', 'attack2', -60, 3, 5);
 
 -- ============================================================================
 -- hud_layout

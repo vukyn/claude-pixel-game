@@ -3,6 +3,7 @@
 Notes for future Claude sessions. Designs/plans:
 - `docs/superpowers/specs/2026-04-21-char1-controller-design.md` + plan
 - `docs/superpowers/specs/2026-04-23-combat-and-enemy-design.md` + plan
+- `docs/superpowers/specs/2026-04-24-enemy-behavior-json-design.md` + plan
 
 ## Layout
 
@@ -16,8 +17,9 @@ internal/
   config/              # godotenv loader (panics on missing env)
   storage/             # sqlite Open + migrations/*.sql + Repository[T]; includes hud_layout table
   anim/                # AnimationSpec (per-spec frame dims + path + grid), sheet slicer, LoadLibrary
-  combat/              # Box + HitboxSpec mapper, Fighter, Resolve, Tuning, AttackMotionSpec (motion.go)
-  enemy/               # Enemy + Kind (kind.go) with AnimPrefix/FrameW/FrameH/Tuning/Boxes/Anims/Motions; FSM (fall/run/attack/attack2/hurt/death), generic AnimsFor/BoxesFor/MotionsFor (loader.go), LoadTuningFor, LoadSpawnTuning
+  combat/              # Box + HitboxSpec mapper, Fighter, Resolve, Tuning
+  behavior/            # JSON-driven BT runtime: Node/Tree/Ctx, Selector/Sequence/Chance/Wait/Action/Condition, action+condition registry, loader+validator
+  enemy/               # Enemy + Kind (kind.go) with AnimPrefix/FrameW/FrameH/Tuning/Boxes/Anims/States/InitialState/BehaviorPath; generic (*Enemy).Tick driver delegates to Kind.States BT; AnimsFor/BoxesFor/LoadBehavior/LoadTuningFor/LoadSpawnTuning/ReloadBehavior
   spawner/             # timer + interval roll + cap enforcement
   stamina/             # stamina pool; drain while sprinting, regen while not; gates sprint
   score/               # score accumulator; incremented on enemy kill by kind-specific points value
@@ -42,7 +44,9 @@ Env from `.env` (template `.env.example`). Missing keys panic at boot. Fresh DB:
 
 ## Tuning CLI (`cmd/tune`)
 
-Inspect/adjust physics params without editing SQL. Values in `tuning` table. `set` validates vs row `min_value`/`max_value`, rejects unknown keys.
+**SOURCE OF TRUTH for tunable params.** Workflow: any change to tuning keys/ranges/units → update this section FIRST, then edit migrations/code to match. Agents exploring/coding/testing must consult this list before grepping or guessing key names; use `make tune ARGS="list"` to verify live DB matches doc.
+
+Inspect/adjust physics params without SQL edit. Values in `tuning` table. `set` validates vs row `min_value`/`max_value`, rejects unknown keys.
 
 ### List every parameter
 
@@ -54,7 +58,7 @@ make tune ARGS="list"
 
 Output: tabwriter table `KEY VALUE MIN MAX UNIT DESCRIPTION`.
 
-Current keys (30):
+Current keys (26):
 
 Physics (6):
 | Key | Unit | Effect |
@@ -73,7 +77,7 @@ Stamina (3):
 | `stamina_drain_per_s` | /s | Drain rate while sprinting |
 | `stamina_regen_per_s` | /s | Regen rate while not sprinting |
 
-Combat + enemy (21):
+Combat + enemy (17):
 | Key | Unit | Effect |
 |---|---|---|
 | `soldier_max_lives` | — | Starting soldier lives (default 10) |
@@ -81,17 +85,13 @@ Combat + enemy (21):
 | `soldier_knockback_vy` | px/s | Upward pop when hit (airborne i-frame) |
 | `soldier_foot_padding` | px | Transparent px at soldier sprite frame bottom |
 | `orc_max_lives` | — | Starting orc lives (default 2) |
-| `orc_run_speed` | px/s | Orc ground speed |
 | `orc_hurt_bounce_vx` | px/s | Horizontal bounce on hurt |
 | `orc_hurt_bounce_vy` | px/s | Upward pop on hurt |
-| `orc_intent_tick_s` | s | Interval for run-vs-attack reroll |
 | `orc_foot_padding` | px | Transparent px at orc sprite frame bottom |
 | `orc_points` | — | Points awarded on orc kill (default 10) |
 | `slime_max_lives` | — | Starting slime lives (default 2) |
-| `slime_run_speed` | px/s | Slime ground speed |
 | `slime_hurt_bounce_vx` | px/s | Horizontal bounce on hurt |
 | `slime_hurt_bounce_vy` | px/s | Upward pop on hurt |
-| `slime_intent_tick_s` | s | Interval for run-vs-attack reroll |
 | `slime_foot_padding` | px | Transparent px at slime sprite frame bottom |
 | `slime_points` | — | Points awarded on slime kill (default 15) |
 | `enemy_spawn_min_s` | s | Minimum enemy spawn interval (all kinds) |
@@ -112,18 +112,6 @@ Exit 1, one of:
 
 Changes apply next `make run`. No hot reload.
 
-### Motions (`attack_motions` table)
-
-```bash
-go run ./cmd/tune motions list
-go run ./cmd/tune motions get <id>
-go run ./cmd/tune motions set <id> <field> <value>   # fields: owner, kind, vx, frame_start, frame_end
-go run ./cmd/tune motions add <id> <owner> <kind> <vx> <fs> <fe>
-go run ./cmd/tune motions delete <id>
-```
-
-Mirrors the `hitboxes` subcommand shape. Used to retune slime backstep feel and to add motions for future enemy kinds.
-
 ### HUD layout (`hud_layout` table)
 
 ```bash
@@ -134,12 +122,12 @@ go run ./cmd/tune hud set <key> <field> <value>   # fields: x, y, w, h, anchor, 
 
 Keys: `heart`, `lives_text`, `score_text`, `stamina_bar`.
 Anchors: `top_left`, `top_right`, `bottom_left`, `bottom_right`.
-`x/y` = offset of the element's nearest corner from the screen anchor corner.
-For text elements, stored `w/h=0` → width is measured at draw time.
+`x/y` = offset of element's nearest corner from screen anchor corner.
+Text elements: stored `w/h=0` → width measured at draw time.
 
 ## Debug overlay
 
-Toggle **F3** in-game. Layout `config/debug.json` — edit, restart. Unknown field keys = boot-time error listing valid keys. Catalog: `internal/debug/fields.go` (23 fields: 19 player/engine + 4 orc/lives). **F4** toggles hitbox debug draw (green = body, red = active attack box).
+Toggle **F3** in-game. Layout `config/debug.json` — edit, restart. Unknown field keys = boot-time error listing valid keys. Catalog: `internal/debug/fields.go` (25 fields: 19 player/engine + 4 orc/lives + 2 behavior). **F4** toggles hitbox debug draw (green = body, red = active attack box).
 
 ## Controls
 
@@ -152,6 +140,7 @@ Toggle **F3** in-game. Layout `config/debug.json` — edit, restart. Unknown fie
 | Attack2 | `K` or `C` (edge) |
 | Debug overlay | `F3` (edge) |
 | Hitbox debug | `F4` (edge) |
+| Reload behavior JSON | `F5` (edge) |
 | Pause | `Esc` (edge) |
 | Resume (while paused) | Any key (edge, action swallowed that tick) |
 | Restart (on GAME OVER) | `R` (edge) |
@@ -160,31 +149,39 @@ Shift alone = no-op. No double-jump. Attacks cancelable by Jump only (grounded).
 
 ## State machines
 
-**Soldier** (8 states): `Idle`, `Run`, `Jump`, `Fall`, `Attack`, `Attack2`, `Hit`, `Death`. `Hit` = bounced back + airborne i-frame until grounded. `Death` = 10 lives consumed, terminal. Sprint is gated by stamina — depletes while sprinting, regenerates otherwise.
+**Soldier** (8 states): `Idle`, `Run`, `Jump`, `Fall`, `Attack`, `Attack2`, `Hit`, `Death`. `Hit` = bounced back + airborne i-frame until grounded. `Death` = 10 lives consumed, terminal. Sprint gated by stamina — depletes sprinting, regens otherwise.
 
-**Orc** (6 states): `Fall` (from spawn), `Run`, `Attack`, `Attack2`, `Hurt`, `Death`. Every `orc_intent_tick_s`, Run either stays or 50/50 picks `Attack`/`Attack2`. 2 lives — second hit kills. Hurt anim = i-frame window. `internal/enemy/states.go`.
+**Orc** (6 states): `Fall` (from spawn), `Run`, `Attack`, `Attack2`, `Hurt`, `Death`. State list + decision tree (what to do while running) from `assets/behaviors/orc.json`. Run state reroll every 2 s: 50% attack (50/50 attack1/attack2), 50% flip/stop (50/50). 2 lives — second hit kills. Hurt anim = i-frame window.
 
-**Slime** (6 states): identical FSM to orc — `Fall` → `Run` → `Attack`/`Attack2` → `Hurt`/`Death`, using `slime_intent_tick_s`. Attack2 applies a backward VX slide on frames 3–5 (configurable via `attack_motions` table → row `slime_attack2_motion`).
+**Slime** (6 states): identical FSM shape to orc, `assets/behaviors/slime.json`. Run speed 60 (vs orc 80). Attack2 applies backward VX=-60 slide on frames 3–5 via per-state `on_frame_vx` in JSON.
 
 ## Combat + hitboxes
 
-Hitbox table seeded by migration 012. Each fighter has a body box (always-on) and attack/attack2 boxes (frame-windowed). `combat.Resolve(attackers, victims)` returns `HitEvent`s via AABB overlap, respecting facing flip, invulnerability, and per-swing dedup. Soldier attack → enemy.OnHit (decrement, bounce or die). Enemy attack → player.OnHit (knockback + airborne i-frame until land).
+Hitbox table seeded by migration 012. Each fighter has body box (always-on) and attack/attack2 boxes (frame-windowed). `combat.Resolve(attackers, victims)` returns `HitEvent`s via AABB overlap, respecting facing flip, invulnerability, per-swing dedup. Soldier attack → enemy.OnHit (decrement, bounce or die). Enemy attack → player.OnHit (knockback + airborne i-frame until land).
 
-Hitbox dims stored in `hitboxes` table (not in `tuning`). Retune via new migration.
+Hitbox dims in `hitboxes` table (not `tuning`). Retune via new migration.
 
-**Attack motions** (`attack_motions` table, migration 019) optionally apply a per-frame-window VX slide during an attack state. VX is signed: positive = forward along facing, negative = backward. Seeded for slime Attack2 only (`slime_attack2_motion`: vx=-60, frames 3–5). Retune via `tune motions set <id> <field> <value>`. Orcs have no motion rows; their attacks keep VX=0.
+## Behavior JSON
 
-## Spawner
+Per-kind state list + decision trees in `assets/behaviors/<kind>.json`. Runtime: `internal/behavior/` (Node/Tree/Ctx, Selector/Sequence/Chance/Wait/Action/Condition, loader + validator + action/condition registry). See `assets/behaviors/README.md` for schema + v1 built-in actions/conditions.
 
-`internal/spawner` is multi-kind: rolls interval uniformly from `[enemy_spawn_min_s, enemy_spawn_max_s]`, caps at `enemy_max_alive` across all kinds combined, then weighted-rolls which `Kind` to spawn (currently orc + slime). Spawn position = random X above screen (`Y = -kind.FrameH*renderScale`). Enemy enters `fall` → `run` on land.
+Each state declares `id`, `anim`, `decision`, optional `bt` (for decision states), `exit_on`, `next`, `on_exit_actions`, `on_frame_vx`. Engine-owned event transitions (hit → hurt, lives=0 → death, fall → run on grounded) bypass BT. Decision states run BT each tick; non-decision states run per-frame VX + exit on `exit_on` rule → `on_exit_actions` → transition to `next`.
 
-## HUD + font
+Per-frame attack VX (replaces old `attack_motions` SQLite table) lives on state decl as `on_frame_vx: [{frame_start, frame_end, vx}]`. Slime `attack2` has `vx=-60, frames 3-5`.
 
-Heart anim from `assets/huds/healthbar/heartbeat.png` (row 3 of 4×6 grid, 4 frames, 400ms loop) + monogram-font `xN` lives counter. Stamina bar drawn from `assets/huds/healthbar/healthbar.png`. Score text shown top-left. Element positions loaded from `hud_layout` table via `internal/hud/layout.go`. GAME OVER overlay (dim + "GAME OVER" @96 + "Press R to restart" @32) on soldier death. Pause overlay (dim + "PAUSED" + "Press any key to resume") on `ModePaused`. Font loaded from `FONT_PATH` env (`./assets/fonts/monogram/ttf/monogram.ttf`) via `text/v2`.
+Press **F5** in-game to re-parse all behavior JSON. Parse failure logs + retains old tree. Live enemies keep original cloned BT until despawn; new spawns pick up reload.
 
 ## Migrations
 
-`internal/storage/migrations/*.sql` embedded via `//go:embed`, applied in order by `internal/storage/migrations.go`. Tracked in `schema_migrations`. Never edit applied migration — add new numbered file.
+Per user preference in memory: schema → edit `001_init_schema.sql` in place; seed → edit `002_seed_data.sql` in place. Never create `003_*.sql`. User wipes `data/` between test runs.
+
+## Spawner
+
+`internal/spawner` multi-kind: rolls interval uniformly from `[enemy_spawn_min_s, enemy_spawn_max_s]`, caps at `enemy_max_alive` across all kinds, then weighted-rolls which `Kind` to spawn (currently orc + slime). Spawn position = random X above screen (`Y = -kind.FrameH*renderScale`). Enemy enters `fall` → `run` on land.
+
+## HUD + font
+
+Heart anim from `assets/huds/healthbar/heartbeat.png` (row 3 of 4×6 grid, 4 frames, 400ms loop) + monogram-font `xN` lives counter. Stamina bar from `assets/huds/healthbar/healthbar.png`. Score text top-left. Element positions loaded from `hud_layout` table via `internal/hud/layout.go`. GAME OVER overlay (dim + "GAME OVER" @96 + "Press R to restart" @32) on soldier death. Pause overlay (dim + "PAUSED" + "Press any key to resume") on `ModePaused`. Font loaded from `FONT_PATH` env (`./assets/fonts/monogram/ttf/monogram.ttf`) via `text/v2`.
 
 ## Tests
 

@@ -14,6 +14,8 @@ type FieldSource interface {
 	EngineTPS() float64
 	EnemyCount() int
 	NextSpawnS() float64
+	NearestEnemyState() string
+	NearestEnemyBranch() string
 }
 
 type Field struct {
@@ -62,4 +64,6 @@ var Catalog = map[string]Field{
 	"orc_next_spawn_s":    {"orc_next_spawn_s", func(s FieldSource) string { return fmt.Sprintf("NextSpawn: %.2fs", s.NextSpawnS()) }},
 	"player_lives":        {"player_lives", func(s FieldSource) string { return fmt.Sprintf("Lives: %d", s.Player().Lives) }},
 	"player_invulnerable": {"player_invulnerable", func(s FieldSource) string { return fmt.Sprintf("Invul: %t", s.Player().HitFlag) }},
+	"enemy_state":          {"enemy_state", func(s FieldSource) string { return "EnemyState: " + s.NearestEnemyState() }},
+	"enemy_bt_last_branch": {"enemy_bt_last_branch", func(s FieldSource) string { return "EnemyBT: " + s.NearestEnemyBranch() }},
 }

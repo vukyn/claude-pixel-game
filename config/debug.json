@@ -6,6 +6,6 @@
     { "title": "Animation",  "fields": ["anim_id", "anim_frame", "anim_elapsed_ms"] },
     { "title": "Intent",     "fields": ["intent_left", "intent_right", "intent_jump", "intent_sprint", "intent_attack", "intent_attack2"] },
     { "title": "Engine",     "fields": ["fps", "tps"] },
-    { "title": "Enemies",    "fields": ["enemy_count", "orc_next_spawn_s"] }
+    { "title": "Enemies",    "fields": ["enemy_count", "orc_next_spawn_s", "enemy_state", "enemy_bt_last_branch"] }
   ]
 }

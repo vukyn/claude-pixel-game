@@ -9,11 +9,9 @@ import (
 )
 
 // Tuning holds per-kind physics/AI knobs read from the tuning table with
-// a prefix (e.g. "orc_run_speed", "slime_run_speed").
+// a prefix (e.g. "orc_hurt_bounce_vx", "slime_hurt_bounce_vx").
 type Tuning struct {
 	MaxLives     float64
-	RunSpeed     float64
-	IntentTickS  float64
 	HurtBounceVX float64
 	HurtBounceVY float64
 	FootPadding  int
@@ -39,9 +37,8 @@ func loadTuneMap(repo *storage.Repository[player.TuningParam]) (map[string]float
 	return m, nil
 }
 
-// LoadTuningFor reads six per-kind keys: <prefix>_max_lives, <prefix>_run_speed,
-// <prefix>_intent_tick_s, <prefix>_hurt_bounce_vx, <prefix>_hurt_bounce_vy,
-// <prefix>_foot_padding.
+// LoadTuningFor reads per-kind keys: <prefix>_max_lives, <prefix>_hurt_bounce_vx,
+// <prefix>_hurt_bounce_vy, <prefix>_foot_padding, <prefix>_points.
 func LoadTuningFor(repo *storage.Repository[player.TuningParam], prefix string) (*Tuning, error) {
 	m, err := loadTuneMap(repo)
 	if err != nil {
@@ -60,8 +57,6 @@ func LoadTuningFor(repo *storage.Repository[player.TuningParam], prefix string) 
 		p *float64
 	}{
 		{prefix + "_max_lives", &t.MaxLives},
-		{prefix + "_run_speed", &t.RunSpeed},
-		{prefix + "_intent_tick_s", &t.IntentTickS},
 		{prefix + "_hurt_bounce_vx", &t.HurtBounceVX},
 		{prefix + "_hurt_bounce_vy", &t.HurtBounceVY},
 	}
