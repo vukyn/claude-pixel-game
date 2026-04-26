@@ -28,6 +28,13 @@ func main() {
 	app := &cli.Command{
 		Name:  "claude-pixel-tune",
 		Usage: "Manage tuning + hitbox rows stored in SQLite",
+		Flags: []cli.Flag{
+			&cli.BoolFlag{
+				Name:    "agent-mode",
+				Usage:   "Compact machine-friendly output (no headers, no padding, TSV/key=val)",
+				Sources: cli.EnvVars("TUNE_AGENT_MODE"),
+			},
+		},
 		Commands: []*cli.Command{
 			tuningListCmd(tuneRepo),
 			tuningSetCmd(tuneRepo),
@@ -42,6 +49,13 @@ func main() {
 	}
 }
 
+// agentMode reports whether --agent-mode (or TUNE_AGENT_MODE env) is set.
+// urfave/cli v3 lookupFlag walks ancestor lineage, so this resolves the
+// root-level persistent flag from any subcommand.
+func agentMode(c *cli.Command) bool {
+	return c.Bool("agent-mode")
+}
+
 func tuningListCmd(repo *storage.Repository[player.TuningParam]) *cli.Command {
 	return &cli.Command{
 		Name:  "list",
@@ -50,6 +64,13 @@ func tuningListCmd(repo *storage.Repository[player.TuningParam]) *cli.Command {
 			params, err := repo.List(ctx)
 			if err != nil {
 				return err
+			}
+			if agentMode(c) {
+				for _, p := range params {
+					fmt.Printf("%s\t%.2f\t%.2f\t%.2f\t%s\t%s\n",
+						p.Key, p.Value, p.MinValue, p.MaxValue, p.Unit, p.Description)
+				}
+				return nil
 			}
 			w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 			fmt.Fprintln(w, "KEY\tVALUE\tMIN\tMAX\tUNIT\tDESCRIPTION")
@@ -93,6 +114,10 @@ func tuningSetCmd(repo *storage.Repository[player.TuningParam]) *cli.Command {
 			if err := repo.Upsert(ctx, p); err != nil {
 				return err
 			}
+			if agentMode(c) {
+				fmt.Printf("OK\t%s\t%.4f\t%.4f\t%s\n", p.Key, newVal, old, p.Unit)
+				return nil
+			}
 			unit := ""
 			if p.Unit != "" {
 				unit = " " + p.Unit
@@ -116,6 +141,13 @@ func hitboxesCmd(repo *storage.Repository[combat.HitboxSpec]) *cli.Command {
 					if err != nil {
 						return err
 					}
+					if agentMode(c) {
+						for _, h := range rows {
+							fmt.Printf("%s\t%s\t%s\t%d\t%d\t%d\t%d\t%d\t%d\n",
+								h.ID, h.Owner, h.Kind, h.OffsetX, h.OffsetY, h.Width, h.Height, h.FrameStart, h.FrameEnd)
+						}
+						return nil
+					}
 					w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 					fmt.Fprintln(w, "ID\tOWNER\tKIND\tOFFSET_X\tOFFSET_Y\tWIDTH\tHEIGHT\tFRAME_START\tFRAME_END")
 					for _, h := range rows {
@@ -137,6 +169,11 @@ func hitboxesCmd(repo *storage.Repository[combat.HitboxSpec]) *cli.Command {
 					h, err := repo.Get(ctx, id)
 					if err != nil {
 						return fmt.Errorf("unknown hitbox id %q", id)
+					}
+					if agentMode(c) {
+						fmt.Printf("%s\t%s\t%s\t%d\t%d\t%d\t%d\t%d\t%d\n",
+							h.ID, h.Owner, h.Kind, h.OffsetX, h.OffsetY, h.Width, h.Height, h.FrameStart, h.FrameEnd)
+						return nil
 					}
 					fmt.Printf("id=%s owner=%s kind=%s offset_x=%d offset_y=%d width=%d height=%d frame_start=%d frame_end=%d\n",
 						h.ID, h.Owner, h.Kind, h.OffsetX, h.OffsetY, h.Width, h.Height, h.FrameStart, h.FrameEnd)
@@ -167,6 +204,10 @@ func hitboxesCmd(repo *storage.Repository[combat.HitboxSpec]) *cli.Command {
 					}
 					if err := repo.Upsert(ctx, h); err != nil {
 						return err
+					}
+					if agentMode(c) {
+						fmt.Printf("OK\t%s\t%s\t%s\n", id, field, raw)
+						return nil
 					}
 					fmt.Printf("OK: %s.%s updated\n  was: %s\n  now: %s\n", id, field, before, formatHitbox(h))
 					return nil
@@ -208,6 +249,11 @@ func hitboxesCmd(repo *storage.Repository[combat.HitboxSpec]) *cli.Command {
 					if err := repo.Upsert(ctx, h); err != nil {
 						return err
 					}
+					if agentMode(c) {
+						fmt.Printf("OK\t%s\t%s\t%s\t%d\t%d\t%d\t%d\t%d\t%d\n",
+							h.ID, h.Owner, h.Kind, h.OffsetX, h.OffsetY, h.Width, h.Height, h.FrameStart, h.FrameEnd)
+						return nil
+					}
 					fmt.Printf("OK: added/updated %s\n", h.ID)
 					return nil
 				},
@@ -226,6 +272,10 @@ func hitboxesCmd(repo *storage.Repository[combat.HitboxSpec]) *cli.Command {
 					}
 					if err := repo.Delete(ctx, id); err != nil {
 						return err
+					}
+					if agentMode(c) {
+						fmt.Printf("OK\tdeleted\t%s\n", id)
+						return nil
 					}
 					fmt.Printf("OK: deleted %s\n", id)
 					return nil
@@ -308,6 +358,13 @@ func hudCmd(repo *storage.Repository[hud.LayoutRow]) *cli.Command {
 					if err != nil {
 						return err
 					}
+					if agentMode(c) {
+						for _, r := range rows {
+							fmt.Printf("%s\t%d\t%d\t%d\t%d\t%s\t%.2f\n",
+								r.Key, r.X, r.Y, r.W, r.H, r.AnchorS, r.Scale)
+						}
+						return nil
+					}
 					w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 					fmt.Fprintln(w, "KEY\tX\tY\tW\tH\tANCHOR\tSCALE")
 					for _, r := range rows {
@@ -329,6 +386,11 @@ func hudCmd(repo *storage.Repository[hud.LayoutRow]) *cli.Command {
 					r, err := repo.Get(ctx, key)
 					if err != nil {
 						return fmt.Errorf("unknown hud layout key %q", key)
+					}
+					if agentMode(c) {
+						fmt.Printf("%s\t%d\t%d\t%d\t%d\t%s\t%.2f\n",
+							r.Key, r.X, r.Y, r.W, r.H, r.AnchorS, r.Scale)
+						return nil
 					}
 					fmt.Printf("key=%s x=%d y=%d w=%d h=%d anchor=%s scale=%.2f\n",
 						r.Key, r.X, r.Y, r.W, r.H, r.AnchorS, r.Scale)
@@ -358,6 +420,10 @@ func hudCmd(repo *storage.Repository[hud.LayoutRow]) *cli.Command {
 					}
 					if err := repo.Upsert(ctx, r); err != nil {
 						return err
+					}
+					if agentMode(c) {
+						fmt.Printf("OK\t%s\t%s\t%s\n", key, field, raw)
+						return nil
 					}
 					fmt.Printf("OK: %s.%s updated\n  was: %s\n  now: %s\n", key, field, before, formatHUDRow(r))
 					return nil
