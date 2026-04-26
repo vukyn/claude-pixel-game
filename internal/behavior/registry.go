@@ -30,10 +30,10 @@ type ActionMeta struct {
 // actions and conditions are written exclusively during package init() and
 // read-only thereafter. Not safe for concurrent modification.
 var (
-	actions       = map[string]ActionFn{}
-	conditions    = map[string]ConditionFn{}
-	actionMetas   = map[string]ActionMeta{}
-	conditionMeta = map[string]ActionMeta{}
+	actions        = map[string]ActionFn{}
+	conditions     = map[string]ConditionFn{}
+	actionMetas    = map[string]ActionMeta{}
+	conditionMetas = map[string]ActionMeta{}
 )
 
 // RegisterAction registers fn under name. Panics on duplicate name to surface
@@ -63,14 +63,14 @@ func RegisterActionWithMeta(name string, args []ArgMeta, fn ActionFn) {
 // RegisterConditionWithMeta registers fn under name and records its arg schema for editor introspection.
 func RegisterConditionWithMeta(name string, args []ArgMeta, fn ConditionFn) {
 	RegisterCondition(name, fn)
-	conditionMeta[name] = ActionMeta{Name: name, Args: args}
+	conditionMetas[name] = ActionMeta{Name: name, Args: args}
 }
 
 // RegisteredActions returns metadata for every registered action, sorted by name.
 func RegisteredActions() []ActionMeta { return sortedMetas(actionMetas) }
 
 // RegisteredConditions returns metadata for every registered condition, sorted by name.
-func RegisteredConditions() []ActionMeta { return sortedMetas(conditionMeta) }
+func RegisteredConditions() []ActionMeta { return sortedMetas(conditionMetas) }
 
 func sortedMetas(m map[string]ActionMeta) []ActionMeta {
 	out := make([]ActionMeta, 0, len(m))

@@ -184,6 +184,11 @@ func TestRegisterDuplicateConditionPanics(t *testing.T) {
 
 func TestRegisteredActions_ReturnsBuiltinsWithArgSchema(t *testing.T) {
 	metas := RegisteredActions()
+	for i := 0; i < len(metas)-1; i++ {
+		if metas[i].Name > metas[i+1].Name {
+			t.Fatalf("not sorted: %s > %s", metas[i].Name, metas[i+1].Name)
+		}
+	}
 	byName := map[string]ActionMeta{}
 	for _, m := range metas {
 		byName[m.Name] = m
@@ -206,6 +211,11 @@ func TestRegisteredActions_ReturnsBuiltinsWithArgSchema(t *testing.T) {
 
 func TestRegisteredConditions_ReturnsBuiltinsWithArgSchema(t *testing.T) {
 	metas := RegisteredConditions()
+	for i := 0; i < len(metas)-1; i++ {
+		if metas[i].Name > metas[i+1].Name {
+			t.Fatalf("not sorted: %s > %s", metas[i].Name, metas[i+1].Name)
+		}
+	}
 	byName := map[string]ActionMeta{}
 	for _, m := range metas {
 		byName[m.Name] = m
