@@ -181,3 +181,47 @@ func TestRegisterDuplicateConditionPanics(t *testing.T) {
 	// "grounded" is already registered by init.
 	RegisterCondition("grounded", func(_ map[string]any, _ *Ctx) (bool, error) { return true, nil })
 }
+
+func TestRegisteredActions_ReturnsBuiltinsWithArgSchema(t *testing.T) {
+	metas := RegisteredActions()
+	byName := map[string]ActionMeta{}
+	for _, m := range metas {
+		byName[m.Name] = m
+	}
+	goto_, ok := byName["goto"]
+	if !ok {
+		t.Fatal("goto not registered")
+	}
+	if len(goto_.Args) != 1 || goto_.Args[0].Name != "state" || goto_.Args[0].Type != "state_id" || !goto_.Args[0].Required {
+		t.Fatalf("goto arg schema unexpected: %+v", goto_.Args)
+	}
+	setVx, ok := byName["set_vx_forward"]
+	if !ok {
+		t.Fatal("set_vx_forward not registered")
+	}
+	if len(setVx.Args) != 1 || setVx.Args[0].Type != "float" {
+		t.Fatalf("set_vx_forward arg schema unexpected: %+v", setVx.Args)
+	}
+}
+
+func TestRegisteredConditions_ReturnsBuiltinsWithArgSchema(t *testing.T) {
+	metas := RegisteredConditions()
+	byName := map[string]ActionMeta{}
+	for _, m := range metas {
+		byName[m.Name] = m
+	}
+	g, ok := byName["grounded"]
+	if !ok {
+		t.Fatal("grounded not registered")
+	}
+	if len(g.Args) != 0 {
+		t.Fatalf("grounded should have no args: %+v", g.Args)
+	}
+	frame, ok := byName["anim_frame_ge"]
+	if !ok {
+		t.Fatal("anim_frame_ge not registered")
+	}
+	if len(frame.Args) != 1 || frame.Args[0].Type != "int" {
+		t.Fatalf("anim_frame_ge arg schema unexpected: %+v", frame.Args)
+	}
+}
