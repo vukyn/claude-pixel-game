@@ -44,7 +44,9 @@ Env from `.env` (template `.env.example`). Missing keys panic at boot. Fresh DB:
 
 ## Tuning CLI (`cmd/tune`)
 
-Inspect/adjust physics params without editing SQL. Values in `tuning` table. `set` validates vs row `min_value`/`max_value`, rejects unknown keys.
+**SOURCE OF TRUTH for tunable params.** Workflow: any change to tuning keys/ranges/units → update this section FIRST, then edit migrations/code to match. Agents exploring/coding/testing must consult this list before grepping or guessing key names; use `make tune ARGS="list"` to verify live DB matches doc.
+
+Inspect/adjust physics params without SQL edit. Values in `tuning` table. `set` validates vs row `min_value`/`max_value`, rejects unknown keys.
 
 ### List every parameter
 
@@ -120,8 +122,8 @@ go run ./cmd/tune hud set <key> <field> <value>   # fields: x, y, w, h, anchor, 
 
 Keys: `heart`, `lives_text`, `score_text`, `stamina_bar`.
 Anchors: `top_left`, `top_right`, `bottom_left`, `bottom_right`.
-`x/y` = offset of the element's nearest corner from the screen anchor corner.
-For text elements, stored `w/h=0` → width is measured at draw time.
+`x/y` = offset of element's nearest corner from screen anchor corner.
+Text elements: stored `w/h=0` → width measured at draw time.
 
 ## Debug overlay
 
@@ -147,27 +149,27 @@ Shift alone = no-op. No double-jump. Attacks cancelable by Jump only (grounded).
 
 ## State machines
 
-**Soldier** (8 states): `Idle`, `Run`, `Jump`, `Fall`, `Attack`, `Attack2`, `Hit`, `Death`. `Hit` = bounced back + airborne i-frame until grounded. `Death` = 10 lives consumed, terminal. Sprint is gated by stamina — depletes while sprinting, regenerates otherwise.
+**Soldier** (8 states): `Idle`, `Run`, `Jump`, `Fall`, `Attack`, `Attack2`, `Hit`, `Death`. `Hit` = bounced back + airborne i-frame until grounded. `Death` = 10 lives consumed, terminal. Sprint gated by stamina — depletes sprinting, regens otherwise.
 
-**Orc** (6 states): `Fall` (from spawn), `Run`, `Attack`, `Attack2`, `Hurt`, `Death`. State list + decision tree (what to do while running) comes from `assets/behaviors/orc.json`. Run state reroll every 2 s: 50% attack (50/50 attack1/attack2), 50% flip/stop (50/50). 2 lives — second hit kills. Hurt anim = i-frame window.
+**Orc** (6 states): `Fall` (from spawn), `Run`, `Attack`, `Attack2`, `Hurt`, `Death`. State list + decision tree (what to do while running) from `assets/behaviors/orc.json`. Run state reroll every 2 s: 50% attack (50/50 attack1/attack2), 50% flip/stop (50/50). 2 lives — second hit kills. Hurt anim = i-frame window.
 
-**Slime** (6 states): identical FSM shape to orc, `assets/behaviors/slime.json`. Run speed 60 (vs orc 80). Attack2 applies a backward VX=-60 slide on frames 3–5 via the per-state `on_frame_vx` declaration in JSON.
+**Slime** (6 states): identical FSM shape to orc, `assets/behaviors/slime.json`. Run speed 60 (vs orc 80). Attack2 applies backward VX=-60 slide on frames 3–5 via per-state `on_frame_vx` in JSON.
 
 ## Combat + hitboxes
 
-Hitbox table seeded by migration 012. Each fighter has a body box (always-on) and attack/attack2 boxes (frame-windowed). `combat.Resolve(attackers, victims)` returns `HitEvent`s via AABB overlap, respecting facing flip, invulnerability, and per-swing dedup. Soldier attack → enemy.OnHit (decrement, bounce or die). Enemy attack → player.OnHit (knockback + airborne i-frame until land).
+Hitbox table seeded by migration 012. Each fighter has body box (always-on) and attack/attack2 boxes (frame-windowed). `combat.Resolve(attackers, victims)` returns `HitEvent`s via AABB overlap, respecting facing flip, invulnerability, per-swing dedup. Soldier attack → enemy.OnHit (decrement, bounce or die). Enemy attack → player.OnHit (knockback + airborne i-frame until land).
 
-Hitbox dims stored in `hitboxes` table (not in `tuning`). Retune via new migration.
+Hitbox dims in `hitboxes` table (not `tuning`). Retune via new migration.
 
 ## Behavior JSON
 
-Per-kind state list + decision trees live in `assets/behaviors/<kind>.json`. Runtime: `internal/behavior/` (Node/Tree/Ctx, Selector/Sequence/Chance/Wait/Action/Condition, loader + validator + action/condition registry). See `assets/behaviors/README.md` for the schema + v1 built-in actions/conditions.
+Per-kind state list + decision trees in `assets/behaviors/<kind>.json`. Runtime: `internal/behavior/` (Node/Tree/Ctx, Selector/Sequence/Chance/Wait/Action/Condition, loader + validator + action/condition registry). See `assets/behaviors/README.md` for schema + v1 built-in actions/conditions.
 
-Each state declares `id`, `anim`, `decision`, optional `bt` (for decision states), `exit_on`, `next`, `on_exit_actions`, `on_frame_vx`. Engine-owned event transitions (hit → hurt, lives=0 → death, fall → run on grounded) bypass the BT. Decision states run their BT each tick; non-decision states run per-frame VX + exit on `exit_on` rule → `on_exit_actions` → transition to `next`.
+Each state declares `id`, `anim`, `decision`, optional `bt` (for decision states), `exit_on`, `next`, `on_exit_actions`, `on_frame_vx`. Engine-owned event transitions (hit → hurt, lives=0 → death, fall → run on grounded) bypass BT. Decision states run BT each tick; non-decision states run per-frame VX + exit on `exit_on` rule → `on_exit_actions` → transition to `next`.
 
-Per-frame attack VX (replaces old `attack_motions` SQLite table) lives on the state decl as `on_frame_vx: [{frame_start, frame_end, vx}]`. Slime `attack2` has `vx=-60, frames 3-5`.
+Per-frame attack VX (replaces old `attack_motions` SQLite table) lives on state decl as `on_frame_vx: [{frame_start, frame_end, vx}]`. Slime `attack2` has `vx=-60, frames 3-5`.
 
-Press **F5** in-game to re-parse all behavior JSON. Parse failure logs + retains old tree. Live enemies keep their original cloned BT until they despawn; new spawns pick up the reload.
+Press **F5** in-game to re-parse all behavior JSON. Parse failure logs + retains old tree. Live enemies keep original cloned BT until despawn; new spawns pick up reload.
 
 ## Migrations
 
@@ -175,11 +177,11 @@ Per user preference in memory: schema → edit `001_init_schema.sql` in place; s
 
 ## Spawner
 
-`internal/spawner` is multi-kind: rolls interval uniformly from `[enemy_spawn_min_s, enemy_spawn_max_s]`, caps at `enemy_max_alive` across all kinds combined, then weighted-rolls which `Kind` to spawn (currently orc + slime). Spawn position = random X above screen (`Y = -kind.FrameH*renderScale`). Enemy enters `fall` → `run` on land.
+`internal/spawner` multi-kind: rolls interval uniformly from `[enemy_spawn_min_s, enemy_spawn_max_s]`, caps at `enemy_max_alive` across all kinds, then weighted-rolls which `Kind` to spawn (currently orc + slime). Spawn position = random X above screen (`Y = -kind.FrameH*renderScale`). Enemy enters `fall` → `run` on land.
 
 ## HUD + font
 
-Heart anim from `assets/huds/healthbar/heartbeat.png` (row 3 of 4×6 grid, 4 frames, 400ms loop) + monogram-font `xN` lives counter. Stamina bar drawn from `assets/huds/healthbar/healthbar.png`. Score text shown top-left. Element positions loaded from `hud_layout` table via `internal/hud/layout.go`. GAME OVER overlay (dim + "GAME OVER" @96 + "Press R to restart" @32) on soldier death. Pause overlay (dim + "PAUSED" + "Press any key to resume") on `ModePaused`. Font loaded from `FONT_PATH` env (`./assets/fonts/monogram/ttf/monogram.ttf`) via `text/v2`.
+Heart anim from `assets/huds/healthbar/heartbeat.png` (row 3 of 4×6 grid, 4 frames, 400ms loop) + monogram-font `xN` lives counter. Stamina bar from `assets/huds/healthbar/healthbar.png`. Score text top-left. Element positions loaded from `hud_layout` table via `internal/hud/layout.go`. GAME OVER overlay (dim + "GAME OVER" @96 + "Press R to restart" @32) on soldier death. Pause overlay (dim + "PAUSED" + "Press any key to resume") on `ModePaused`. Font loaded from `FONT_PATH` env (`./assets/fonts/monogram/ttf/monogram.ttf`) via `text/v2`.
 
 ## Tests
 
