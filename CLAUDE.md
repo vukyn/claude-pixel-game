@@ -44,9 +44,13 @@ Env from `.env` (template `.env.example`). Missing keys panic at boot. Fresh DB:
 
 ## Tuning CLI (`cmd/tune`)
 
-**SOURCE OF TRUTH for tunable params.** Workflow: any change to tuning keys/ranges/units → update this section FIRST, then edit migrations/code to match. Agents exploring/coding/testing must consult this list before grepping or guessing key names; use `make tune ARGS="list"` to verify live DB matches doc.
+**SOURCE OF TRUTH for tunable params.** Workflow: any change to tuning keys/ranges/units → update this section FIRST, then edit migrations/code to match. Agents exploring/coding/testing must consult this list before grepping or guessing key names; use `make tune ARGS="list --agent-mode"` to verify live DB matches doc.
 
 Inspect/adjust physics params without SQL edit. Values in `tuning` table. `set` validates vs row `min_value`/`max_value`, rejects unknown keys.
+
+> **Agents: always pass `--agent-mode`** (or `TUNE_AGENT_MODE=1`) when invoking the tune CLI. Strips headers + tabwriter padding + prose decoration → compact TSV that wastes fewer tokens. All numeric data preserved; errors unchanged. Full output schema: [docs/tune-cli.md](docs/tune-cli.md).
+>
+> **Editing tune CLI?** Any new subcommand or output change MUST branch on `agentMode(c)` and emit a TSV/single-line variant alongside the human-friendly path. Update [docs/tune-cli.md](docs/tune-cli.md) in the same change.
 
 ### List every parameter
 
