@@ -312,3 +312,21 @@ func TestLoadFileGoldenSlime(t *testing.T) {
 		t.Fatalf("slime attack2 on_frame_vx = %+v", fv)
 	}
 }
+
+func TestLoadBytes_ParsesValidJSONWithoutFile(t *testing.T) {
+	raw := []byte(`{"kind":"orc","states":[{"id":"idle","anim":"idle","decision":false,"exit_on":"anim_done","next":"idle"}]}`)
+	f, err := LoadBytes(raw, "in-memory.json")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if f.Kind != "orc" || len(f.States) != 1 {
+		t.Fatalf("unexpected file: %+v", f)
+	}
+}
+
+func TestLoadBytes_PropagatesParseError(t *testing.T) {
+	_, err := LoadBytes([]byte("{bad"), "broken.json")
+	if err == nil {
+		t.Fatal("want error, got nil")
+	}
+}

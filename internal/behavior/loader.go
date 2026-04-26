@@ -6,22 +6,22 @@ import (
 	"os"
 )
 
-// LoadFile parses a behavior JSON file. It returns the root-level data
-// needed by consumers: the kind name, the ordered state declarations, and
-// a per-decision-state tree. State-decl parsing lives in this package as
-// opaque data; internal/enemy layers its own typed view on top.
-//
-// See assets/behaviors/README.md for the schema.
+// LoadFile parses a behavior JSON file by path. Convenience wrapper around LoadBytes.
 func LoadFile(path string) (*File, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("behavior: read %s: %w", path, err)
 	}
+	return LoadBytes(data, path)
+}
+
+// LoadBytes parses a behavior JSON document. `source` is used only for error messages.
+func LoadBytes(data []byte, source string) (*File, error) {
 	var raw FileRaw
 	if err := json.Unmarshal(data, &raw); err != nil {
-		return nil, fmt.Errorf("behavior: parse %s: %w", path, err)
+		return nil, fmt.Errorf("behavior: parse %s: %w", source, err)
 	}
-	return buildFile(&raw, path)
+	return buildFile(&raw, source)
 }
 
 // FileRaw is the JSON-facing shape. Exported so callers can
