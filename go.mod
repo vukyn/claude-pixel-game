@@ -3,6 +3,7 @@ module claude-pixel
 go 1.26.2
 
 require (
+	github.com/gofiber/fiber/v2 v2.52.13
 	github.com/hajimehoshi/ebiten/v2 v2.9.9
 	github.com/joho/godotenv v1.5.1
 	github.com/urfave/cli/v3 v3.8.0
@@ -16,7 +17,6 @@ require (
 	github.com/ebitengine/hideconsole v1.0.0 // indirect
 	github.com/ebitengine/purego v0.9.0 // indirect
 	github.com/go-text/typesetting v0.3.0 // indirect
-	github.com/gofiber/fiber/v2 v2.52.13 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/jezek/xgb v1.1.1 // indirect
 	github.com/klauspost/compress v1.17.9 // indirect

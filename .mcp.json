@@ -3,6 +3,13 @@
     "drawio": {
       "type": "http",
       "url": "https://mcp.draw.io/mcp"
+    },
+    "shadcn": {
+      "command": "npx",
+      "args": [
+        "shadcn@latest",
+        "mcp"
+      ]
     }
   }
 }

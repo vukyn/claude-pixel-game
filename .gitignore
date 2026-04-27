@@ -4,7 +4,8 @@ bin/
 todo
 
 # Claude Code (per-dev)
-.claude/settings.local.json
+.claude/
+.agents/
 .superpowers/
 
 # Game runtime data (regenerable from migrations)
