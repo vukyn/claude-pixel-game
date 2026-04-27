@@ -8,7 +8,7 @@
 
 Add three FE features to the behavior visual editor:
 
-1. **State Transitions overview** — second tab in canvas area showing inter-state transitions (`state.next` + BT `switch_state` actions), read-only.
+1. **State Transitions overview** — second tab in canvas area showing inter-state transitions (`state.next` + BT `goto` actions), read-only.
 2. **Undo/Redo** — `Cmd/Ctrl+Z` / `Cmd+Shift+Z` (and `Ctrl+Y`) plus TopBar buttons. Behavior-level snapshot. Cap 50. Persist past save.
 3. **Add/remove BT nodes from canvas** — right-click context menu with: Add child (cascading type submenu), Convert to, Delete. Plus "Add root" CTA when a decision state has no BT.
 
@@ -175,14 +175,14 @@ Each menu action calls a single `applyMutation` helper in `BTCanvas` that:
 ### 5. Transitions tab — `bt/transitions.ts`
 
 ```ts
-type TransitionEdgeKind = 'next' | 'switch_state'
+type TransitionEdgeKind = 'next' | 'goto'
 
 interface TransitionEdge {
   id: string                  // "from->to:kind:idx"
   from: string
   to: string                  // state id or "__dead"
   kind: TransitionEdgeKind
-  label?: string              // exit_on for next; "" for switch_state
+  label?: string              // exit_on for next; "" for goto
 }
 
 interface TransitionGraph {
@@ -194,10 +194,10 @@ export function extractTransitions(b: BehaviorJSON, registry: { actions: ActionM
 ```
 
 **Walk:**
-- Nodes = `b.states.map(s => ({ id: s.id, isInitial: s.id === b.initial_state }))`. Append synthetic `{ id: '__dead', isInitial: false }` if any edge references `__dead`.
+- Nodes = `b.states.map((s, i) => ({ id: s.id, isInitial: i === 0 }))`. The behavior JSON has no explicit `initial_state` field — first state in array is initial by convention. Append synthetic `{ id: '__dead', isInitial: false }` if any edge references `__dead`.
 - For each state:
   - If `state.next` is set → push edge `{from: state.id, to: state.next, kind: 'next', label: state.exit_on ?? ''}`.
-  - If `state.bt` exists → walk recursively. Per Q7=A, only `{type: 'action', name: 'switch_state'}` produces an edge. Resolve target id from the action's `state_id`-typed arg via `registry.actions` metadata (the action declares one `state_id` arg; pick its value from `node.args`). Edge: `{from: state.id, to: <argValue>, kind: 'switch_state', label: ''}`. If arg missing/empty, skip silently. Caller passes `registry` into `extractTransitions(b, registry)`.
+  - If `state.bt` exists → walk recursively. Per Q7=A, only `{type: 'action', name: 'goto'}` produces an edge. Resolve target id from the action's `state_id`-typed arg via `registry.actions` metadata (the action declares one `state_id` arg; pick its value from `node.args`). Edge: `{from: state.id, to: <argValue>, kind: 'goto', label: ''}`. If arg missing/empty, skip silently. Caller passes `registry` into `extractTransitions(b, registry)`.
 
 Multi-edge handling (same from→to, same kind): keep as separate edges with distinct `id` suffixes; React Flow renders them as parallel curves.
 
@@ -228,7 +228,7 @@ const nodeTypes = { state: StateNode }
 
 **Edge styling:**
 - `kind='next'` — `style={{ strokeDasharray: '4 2', stroke: 'var(--muted-foreground)' }}`, label = `state.exit_on`.
-- `kind='switch_state'` — solid emerald, no dash, label `BT`. Both kinds use `MarkerType.ArrowClosed`.
+- `kind='goto'` — solid emerald, no dash, label `BT`. Both kinds use `MarkerType.ArrowClosed`.
 
 **Layout:** reuse `bt/layout.ts` dagre helper, parameterize direction via opts (`LR` for transitions, current `TB` for BT). Add `direction` arg with default `'TB'` so existing BT call site is unchanged.
 
@@ -313,7 +313,7 @@ Tab → Transitions
 | File | Coverage |
 |---|---|
 | `bt/__tests__/convert.test.ts` | full `canConvert` matrix; `convertNode` preserves children for composite↔composite; chance branch wrap/unwrap; rejects composite→leaf when non-empty |
-| `bt/__tests__/transitions.test.ts` | run on shipped `assets/behaviors/orc.json` + `slime.json`; assert state count, `next` edge count, `switch_state` edge count, presence of `__dead` |
+| `bt/__tests__/transitions.test.ts` | run on shipped `assets/behaviors/orc.json` + `slime.json`; assert state count, `next` edge count, `goto` edge count, presence of `__dead` |
 | `state/__tests__/btMutations.test.ts` | `addChild` to selector + chance (auto weight=1); `deleteAt` cascade removes whole subtree; `convertAt` throws on invalid; `setRoot` defaults |
 | `state/__tests__/editorStore.undo.test.ts` | setBehavior pushes past; undo restores; redo replays; cap=50 drops oldest; load(kind) clears; save does NOT clear; dirty tracked across undo/redo |
 | `state/__tests__/editorStore.test.ts` | existing tests untouched, baseline still passes |
