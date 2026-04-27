@@ -88,3 +88,7 @@ export function setRoot(rootType: BTNodeType, opts?: { name?: string }): BTNode 
   if (rootType === 'wait') return { type: 'wait', seconds: 1 }
   return { type: rootType, name: opts?.name ?? '', args: {} }
 }
+
+export function readAtPath(bt: BTNode, path: string): BTNode | null {
+  return (getAtPath(bt, path) as BTNode | null) ?? null
+}
