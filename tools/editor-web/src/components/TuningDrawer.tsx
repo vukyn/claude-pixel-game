@@ -59,13 +59,13 @@ export function TuningDrawer() {
                   <div className="text-muted-foreground">{r.description}</div>
                 </td>
                 <td className="px-3 py-2 w-1/3">
-                  <div className="flex flex-col gap-1">
+                  <div className="flex flex-col gap-3 py-1">
                     <Slider
                       min={r.min}
                       max={r.max}
                       value={[r.value]}
                       onValueChange={([v]) => handleChange(r.key, v)}
-                      className="[&_[data-slot=slider-track]]:bg-foreground/15 [&_[data-slot=slider-range]]:bg-primary"
+                      className="[&_[data-slot=slider-track]]:h-1.5 [&_[data-slot=slider-track]]:bg-zinc-700 [&_[data-slot=slider-range]]:bg-emerald-500 [&_[data-slot=slider-thumb]]:size-4 [&_[data-slot=slider-thumb]]:border-emerald-500 [&_[data-slot=slider-thumb]]:bg-zinc-100"
                     />
                     <span className="text-muted-foreground text-[10px] leading-none">[{r.min} .. {r.max}]</span>
                   </div>
