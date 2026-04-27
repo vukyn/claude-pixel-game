@@ -1,4 +1,8 @@
 import { useEffect, useState } from 'react'
+import { Loader2, Save } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useEditorStore } from '../state/editorStore'
 import { listBehaviors } from '../api/client'
 
@@ -21,21 +25,25 @@ export function TopBar() {
   }
 
   return (
-    <header className="h-11 px-4 bg-[#232831] border-b border-[#3a4150] flex items-center gap-3">
-      <span className="font-semibold text-[#5aa3f0]">⚙ Behavior Editor</span>
-      <select className="bg-[#2c3340] text-[#e6e9ef] border border-[#3a4150] rounded px-2 py-1 text-sm"
-              value={currentKind ?? ''} onChange={e => load(e.target.value)}>
-        <option value="">— pick file —</option>
-        {kinds.map(k => <option key={k}>{k}</option>)}
-      </select>
-      {dirty && <span className="text-[#f0a35a] text-xs">● unsaved changes</span>}
+    <header className="h-11 px-4 border-b border-border bg-card flex items-center gap-3">
+      <span className="font-semibold text-primary">⚙ Behavior Editor</span>
+      <Select value={currentKind ?? ''} onValueChange={v => load(v)}>
+        <SelectTrigger className="w-44 h-8 text-sm">
+          <SelectValue placeholder="— pick file —" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectGroup>
+            {kinds.map(k => <SelectItem key={k} value={k}>{k}</SelectItem>)}
+          </SelectGroup>
+        </SelectContent>
+      </Select>
+      {dirty && <Badge variant="outline" className="text-amber-500 border-amber-500/40">● unsaved</Badge>}
       <span className="flex-1" />
-      {error && <span className="text-red-400 text-xs">{error}</span>}
-      {!validation.valid && <span className="text-red-400 text-xs">✗ {validation.errors.length} validation errors</span>}
-      <button onClick={handleSave} disabled={!dirty || saving || !validation.valid}
-        className="bg-[#5aa3f0] disabled:bg-[#3a4150] text-white px-3 py-1 rounded text-sm">
-        {saving ? 'Saving…' : 'Save'}
-      </button>
+      {error && <span className="text-destructive text-xs">{error}</span>}
+      {!validation.valid && <Badge variant="destructive">✗ {validation.errors.length} validation errors</Badge>}
+      <Button onClick={handleSave} disabled={!dirty || saving || !validation.valid} size="sm">
+        {saving ? <><Loader2 data-icon="inline-start" className="animate-spin" />Saving</> : <><Save data-icon="inline-start" />Save</>}
+      </Button>
     </header>
   )
 }
