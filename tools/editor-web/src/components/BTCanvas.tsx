@@ -85,9 +85,10 @@ export function BTCanvas() {
         selectionOnDrag={mode === 'select'}
         nodesDraggable
         fitView
+        className={mode === 'select' ? '[&_.react-flow__pane]:!cursor-default' : ''}
       >
         <Background gap={24} />
-        <MiniMap />
+        <MiniMap pannable zoomable style={{ width: 140, height: 90 }} />
         <Controls />
         <Panel position="top-right">
           <ToggleGroup
