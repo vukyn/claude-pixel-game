@@ -239,7 +239,7 @@ function JsonInspector() {
     )
   }
   const data = (state.bt ?? state) as object
-  const text = JSON.stringify(data, null, 2)
+  const text = JSON.stringify(data)
 
   const copy = () => navigator.clipboard.writeText(text)
   const download = () => {
