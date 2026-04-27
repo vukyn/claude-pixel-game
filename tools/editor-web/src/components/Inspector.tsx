@@ -90,17 +90,44 @@ function NodeInspector({ path }: { path: string | null }) {
             </SelectContent>
           </Select>
         </Field>
-        {meta?.args.map(arg => (
-          <Field key={arg.name}>
-            <FieldLabel htmlFor={`node-arg-${arg.name}`}>{arg.name} ({arg.type}){arg.required ? ' *' : ''}</FieldLabel>
-            <Input
-              id={`node-arg-${arg.name}`}
-              type={arg.type === 'int' || arg.type === 'float' ? 'number' : 'text'}
-              value={String((node.args as Record<string, unknown>)?.[arg.name] ?? '')}
-              onChange={e => updateNode({ args: { ...(node.args ?? {}), [arg.name]: coerceArg(arg.type, e.target.value) } })}
-            />
-          </Field>
-        ))}
+        {meta?.args.map(arg => {
+          const argId = `node-arg-${arg.name}`
+          const value = String((node.args as Record<string, unknown>)?.[arg.name] ?? '')
+          const setArg = (v: unknown) =>
+            updateNode({ args: { ...(node.args ?? {}), [arg.name]: v } })
+
+          if (arg.type === 'state_id') {
+            return (
+              <Field key={arg.name}>
+                <FieldLabel htmlFor={argId}>{arg.name} (state_id){arg.required ? ' *' : ''}</FieldLabel>
+                <Select value={value} onValueChange={setArg}>
+                  <SelectTrigger id={argId}><SelectValue placeholder="—" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value="__dead">__dead</SelectItem>
+                      {behavior.states.map(s => (
+                        <SelectItem key={s.id} value={s.id}>{s.id}</SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+                <p className="text-muted-foreground text-[11px] mt-1">Pick from existing state ids or __dead.</p>
+              </Field>
+            )
+          }
+
+          return (
+            <Field key={arg.name}>
+              <FieldLabel htmlFor={argId}>{arg.name} ({arg.type}){arg.required ? ' *' : ''}</FieldLabel>
+              <Input
+                id={argId}
+                type={arg.type === 'int' || arg.type === 'float' ? 'number' : 'text'}
+                value={value}
+                onChange={e => setArg(coerceArg(arg.type, e.target.value))}
+              />
+            </Field>
+          )
+        })}
       </FieldGroup>
     )
   }
