@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Loader2, Save } from 'lucide-react'
+import { Loader2, Save, Undo2, Redo2 } from 'lucide-react'
+import { useStore } from 'zustand'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -12,11 +13,17 @@ export function TopBar() {
   const validation = useEditorStore(s => s.validation)
   const load = useEditorStore(s => s.load)
   const save = useEditorStore(s => s.save)
+  const past = useStore(useEditorStore.temporal, t => t.pastStates.length)
+  const future = useStore(useEditorStore.temporal, t => t.futureStates.length)
   const [kinds, setKinds] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
-  useEffect(() => { listBehaviors().then(refs => setKinds(refs.map(r => r.kind))).catch(e => setError(String(e))) }, [])
+  useEffect(() => {
+    listBehaviors()
+      .then(refs => setKinds(refs.map(r => r.kind)))
+      .catch(e => setError(String(e)))
+  }, [])
 
   const handleSave = async () => {
     setSaving(true); setError(null)
@@ -37,6 +44,24 @@ export function TopBar() {
           </SelectGroup>
         </SelectContent>
       </Select>
+
+      <Button
+        size="sm" variant="ghost"
+        disabled={past === 0}
+        aria-label="Undo (Cmd+Z)"
+        onClick={() => useEditorStore.temporal.getState().undo()}
+      >
+        <Undo2 />
+      </Button>
+      <Button
+        size="sm" variant="ghost"
+        disabled={future === 0}
+        aria-label="Redo (Cmd+Shift+Z)"
+        onClick={() => useEditorStore.temporal.getState().redo()}
+      >
+        <Redo2 />
+      </Button>
+
       {dirty && <Badge variant="outline" className="text-amber-500 border-amber-500/40">● unsaved</Badge>}
       <span className="flex-1" />
       {error && <span className="text-destructive text-xs">{error}</span>}
