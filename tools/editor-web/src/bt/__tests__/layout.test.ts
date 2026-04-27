@@ -26,4 +26,15 @@ describe('layout', () => {
     const others = laid.filter(n => n.id !== 'root')
     for (const o of others) expect(o.position.x).toBeGreaterThanOrEqual(root.position.x)
   })
+  it('supports rankdir override', () => {
+    const nodes = [
+      { id: 'root', type: 'selector' as const, data: {}, position: { x: 0, y: 0 } },
+      { id: 'a', type: 'action' as const, data: {}, position: { x: 0, y: 0 } },
+    ]
+    const edges = [{ id: 'e', source: 'root', target: 'a', data: { order: 0 } }]
+    const horizontal = layout(nodes, edges, { direction: 'LR' })
+    const vertical   = layout(nodes, edges, { direction: 'TB' })
+    expect(horizontal[1].position.x).toBeGreaterThan(horizontal[0].position.x)
+    expect(vertical[1].position.y).toBeGreaterThan(vertical[0].position.y)
+  })
 })
