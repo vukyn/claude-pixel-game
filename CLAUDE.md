@@ -129,6 +129,49 @@ Anchors: `top_left`, `top_right`, `bottom_left`, `bottom_right`.
 `x/y` = offset of element's nearest corner from screen anchor corner.
 Text elements: stored `w/h=0` → width measured at draw time.
 
+## Editor server (`cmd/editor`)
+
+Go Fiber HTTP server backing the React FE in `tools/editor-web`. Reuses
+`internal/behavior` loader + `internal/storage` repo as single sources of
+truth for validation and persistence.
+
+```bash
+make editor                     # go run ./cmd/editor (port from EDITOR_PORT, default 8080)
+```
+
+Endpoints (`/api/...`):
+- `GET    /behaviors`              list available kinds
+- `GET    /behaviors/:kind`        raw JSON
+- `PUT    /behaviors/:kind`        validate + atomic write
+- `POST   /behaviors/:kind/validate`
+- `GET    /tuning?prefix=orc`      list tuning rows
+- `PUT    /tuning/:key`            range-checked update
+- `GET    /registry/actions`       action metadata for editor dropdowns
+- `GET    /registry/conditions`    condition metadata
+
+Light hexagonal layout in `internal/editor/`:
+
+```
+http/        Fiber handlers + CORS/log middleware
+service/     Behavior / Tuning / Registry use cases
+port/        BehaviorStore, TuningStore, RegistryStore interfaces
+adapter/     FSBehavior (FS), SQLiteTuning (storage repo), RuntimeRegistry (behavior pkg)
+```
+
+Game (`cmd/game`) is unchanged. Press F5 in-game to reload behaviors after editor saves.
+
+## Editor FE (`tools/editor-web`)
+
+React + Vite + TS + Tailwind + shadcn/ui + React Flow + Zustand. See [tools/editor-web/README.md](tools/editor-web/README.md).
+
+```bash
+make web              # vite dev on :5173 (proxies /api → :8080)
+make web-build        # production bundle
+make web-install      # first-time deps
+```
+
+Two-pane shell: state list (left) → React Flow BT canvas (center) → tabbed inspector (right). Tuning drawer above canvas (collapsed by default). FE pre-validates with the same rules as BE; both must pass for save.
+
 ## Debug overlay
 
 Toggle **F3** in-game. Layout `config/debug.json` — edit, restart. Unknown field keys = boot-time error listing valid keys. Catalog: `internal/debug/fields.go` (25 fields: 19 player/engine + 4 orc/lives + 2 behavior). **F4** toggles hitbox debug draw (green = body, red = active attack box).

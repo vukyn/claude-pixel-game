@@ -1,6 +1,9 @@
 package behavior
 
-import "fmt"
+import (
+	"fmt"
+	"sort"
+)
 
 // ActionFn is a behavior-tree action implementation. Returns the Status the
 // surrounding Action node should emit. Errors are construction-time concerns
@@ -11,11 +14,26 @@ type ActionFn func(args map[string]any, ctx *Ctx) (Status, error)
 // into Success/Failure.
 type ConditionFn func(args map[string]any, ctx *Ctx) (bool, error)
 
+// ArgMeta describes one argument to an action or condition.
+type ArgMeta struct {
+	Name     string `json:"name"`
+	Type     string `json:"type"` // "int" | "float" | "string" | "state_id" | "anim_key"
+	Required bool   `json:"required"`
+}
+
+// ActionMeta describes a registered action or condition for editor introspection.
+type ActionMeta struct {
+	Name string    `json:"name"`
+	Args []ArgMeta `json:"args"`
+}
+
 // actions and conditions are written exclusively during package init() and
 // read-only thereafter. Not safe for concurrent modification.
 var (
-	actions    = map[string]ActionFn{}
-	conditions = map[string]ConditionFn{}
+	actions        = map[string]ActionFn{}
+	conditions     = map[string]ConditionFn{}
+	actionMetas    = map[string]ActionMeta{}
+	conditionMetas = map[string]ActionMeta{}
 )
 
 // RegisterAction registers fn under name. Panics on duplicate name to surface
@@ -34,6 +52,33 @@ func RegisterCondition(name string, fn ConditionFn) {
 		panic("behavior: duplicate condition registration: " + name)
 	}
 	conditions[name] = fn
+}
+
+// RegisterActionWithMeta registers fn under name and records its arg schema for editor introspection.
+func RegisterActionWithMeta(name string, args []ArgMeta, fn ActionFn) {
+	RegisterAction(name, fn)
+	actionMetas[name] = ActionMeta{Name: name, Args: args}
+}
+
+// RegisterConditionWithMeta registers fn under name and records its arg schema for editor introspection.
+func RegisterConditionWithMeta(name string, args []ArgMeta, fn ConditionFn) {
+	RegisterCondition(name, fn)
+	conditionMetas[name] = ActionMeta{Name: name, Args: args}
+}
+
+// RegisteredActions returns metadata for every registered action, sorted by name.
+func RegisteredActions() []ActionMeta { return sortedMetas(actionMetas) }
+
+// RegisteredConditions returns metadata for every registered condition, sorted by name.
+func RegisteredConditions() []ActionMeta { return sortedMetas(conditionMetas) }
+
+func sortedMetas(m map[string]ActionMeta) []ActionMeta {
+	out := make([]ActionMeta, 0, len(m))
+	for _, v := range m {
+		out = append(out, v)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out
 }
 
 // HasAction reports whether name is registered. Used by the loader to
@@ -69,7 +114,7 @@ func RunCondition(name string, args map[string]any, ctx *Ctx) (bool, error) {
 }
 
 func init() {
-	RegisterAction("goto", func(args map[string]any, ctx *Ctx) (Status, error) {
+	RegisterActionWithMeta("goto", []ArgMeta{{Name: "state", Type: "state_id", Required: true}}, func(args map[string]any, ctx *Ctx) (Status, error) {
 		s, err := argString(args, "state")
 		if err != nil {
 			return StatusFailure, err
@@ -77,11 +122,11 @@ func init() {
 		ctx.PendingGoto = s
 		return StatusSuccess, nil
 	})
-	RegisterAction("flip_facing", func(_ map[string]any, ctx *Ctx) (Status, error) {
+	RegisterActionWithMeta("flip_facing", nil, func(_ map[string]any, ctx *Ctx) (Status, error) {
 		ctx.Enemy.SetFacing(-ctx.Enemy.Facing())
 		return StatusSuccess, nil
 	})
-	RegisterAction("randomize_facing", func(_ map[string]any, ctx *Ctx) (Status, error) {
+	RegisterActionWithMeta("randomize_facing", nil, func(_ map[string]any, ctx *Ctx) (Status, error) {
 		if ctx.RNG.Intn(2) == 0 {
 			ctx.Enemy.SetFacing(1)
 		} else {
@@ -89,7 +134,7 @@ func init() {
 		}
 		return StatusSuccess, nil
 	})
-	RegisterAction("set_vx_forward", func(args map[string]any, ctx *Ctx) (Status, error) {
+	RegisterActionWithMeta("set_vx_forward", []ArgMeta{{Name: "speed", Type: "float", Required: true}}, func(args map[string]any, ctx *Ctx) (Status, error) {
 		speed, err := argFloat(args, "speed")
 		if err != nil {
 			return StatusFailure, err
@@ -97,11 +142,11 @@ func init() {
 		ctx.Enemy.SetVX(float64(ctx.Enemy.Facing()) * speed)
 		return StatusSuccess, nil
 	})
-	RegisterAction("stop", func(_ map[string]any, ctx *Ctx) (Status, error) {
+	RegisterActionWithMeta("stop", nil, func(_ map[string]any, ctx *Ctx) (Status, error) {
 		ctx.Enemy.SetVX(0)
 		return StatusSuccess, nil
 	})
-	RegisterAction("play_anim", func(args map[string]any, ctx *Ctx) (Status, error) {
+	RegisterActionWithMeta("play_anim", []ArgMeta{{Name: "key", Type: "anim_key", Required: true}}, func(args map[string]any, ctx *Ctx) (Status, error) {
 		key, err := argString(args, "key")
 		if err != nil {
 			return StatusFailure, err
@@ -110,20 +155,20 @@ func init() {
 		return StatusSuccess, nil
 	})
 
-	RegisterCondition("grounded", func(_ map[string]any, ctx *Ctx) (bool, error) {
+	RegisterConditionWithMeta("grounded", nil, func(_ map[string]any, ctx *Ctx) (bool, error) {
 		return ctx.Enemy.Grounded(), nil
 	})
-	RegisterCondition("anim_done", func(_ map[string]any, ctx *Ctx) (bool, error) {
+	RegisterConditionWithMeta("anim_done", nil, func(_ map[string]any, ctx *Ctx) (bool, error) {
 		return ctx.Enemy.CurrentAnimDone(), nil
 	})
-	RegisterCondition("anim_frame_ge", func(args map[string]any, ctx *Ctx) (bool, error) {
+	RegisterConditionWithMeta("anim_frame_ge", []ArgMeta{{Name: "frame", Type: "int", Required: true}}, func(args map[string]any, ctx *Ctx) (bool, error) {
 		f, err := argFloat(args, "frame")
 		if err != nil {
 			return false, err
 		}
 		return ctx.Enemy.CurrentAnimFrame() >= int(f), nil
 	})
-	RegisterCondition("anim_frame_le", func(args map[string]any, ctx *Ctx) (bool, error) {
+	RegisterConditionWithMeta("anim_frame_le", []ArgMeta{{Name: "frame", Type: "int", Required: true}}, func(args map[string]any, ctx *Ctx) (bool, error) {
 		f, err := argFloat(args, "frame")
 		if err != nil {
 			return false, err
