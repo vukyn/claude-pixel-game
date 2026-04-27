@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -16,18 +16,31 @@ export function TuningDrawer() {
   const [prefix, setPrefix] = useState('orc')
   const [rows, setRows] = useState<TuningRow[]>([])
   const [pending, setPending] = useState<Record<string, 'saving' | 'saved' | 'error'>>({})
+  const debounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
 
   useEffect(() => {
     const eff = prefix === 'physics' ? '' : prefix
     listTuning(eff).then(setRows).catch(() => setRows([]))
   }, [prefix])
 
+  useEffect(() => {
+    const timers = debounceRef.current
+    return () => {
+      Object.values(timers).forEach(clearTimeout)
+    }
+  }, [])
+
+  const DEBOUNCE_MS = 400
+
   const handleChange = (key: string, value: number) => {
     setRows(rs => rs.map(r => r.key === key ? { ...r, value } : r))
     setPending(p => ({ ...p, [key]: 'saving' }))
-    putTuning(key, value)
-      .then(() => setPending(p => ({ ...p, [key]: 'saved' })))
-      .catch(() => setPending(p => ({ ...p, [key]: 'error' })))
+    if (debounceRef.current[key]) clearTimeout(debounceRef.current[key])
+    debounceRef.current[key] = setTimeout(() => {
+      putTuning(key, value)
+        .then(() => setPending(p => ({ ...p, [key]: 'saved' })))
+        .catch(() => setPending(p => ({ ...p, [key]: 'error' })))
+    }, DEBOUNCE_MS)
   }
 
   return (
