@@ -12,7 +12,7 @@ import type { TuningRow } from '../api/schemas'
 const PREFIXES = ['physics', 'stamina', 'soldier', 'orc', 'slime', 'enemy_spawn']
 
 export function TuningDrawer() {
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(false)
   const [prefix, setPrefix] = useState('orc')
   const [rows, setRows] = useState<TuningRow[]>([])
   const [pending, setPending] = useState<Record<string, 'saving' | 'saved' | 'error'>>({})
@@ -59,8 +59,16 @@ export function TuningDrawer() {
                   <div className="text-muted-foreground">{r.description}</div>
                 </td>
                 <td className="px-3 py-2 w-1/3">
-                  <Slider min={r.min} max={r.max} value={[r.value]} onValueChange={([v]) => handleChange(r.key, v)} />
-                  <span className="text-muted-foreground text-[10px]">[{r.min} .. {r.max}]</span>
+                  <div className="flex flex-col gap-1">
+                    <Slider
+                      min={r.min}
+                      max={r.max}
+                      value={[r.value]}
+                      onValueChange={([v]) => handleChange(r.key, v)}
+                      className="[&_[data-slot=slider-track]]:bg-foreground/15 [&_[data-slot=slider-range]]:bg-primary"
+                    />
+                    <span className="text-muted-foreground text-[10px] leading-none">[{r.min} .. {r.max}]</span>
+                  </div>
                 </td>
                 <td className="px-3 py-2 w-1/6">
                   <div className="flex items-center gap-1">
