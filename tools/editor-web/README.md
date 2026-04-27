@@ -1,73 +1,59 @@
-# React + TypeScript + Vite
+# editor-web
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React + Vite + TS + Tailwind + shadcn/ui FE for the behavior visual editor.
 
-Currently, two official plugins are available:
+Pairs with the Go Fiber editor server at `cmd/editor` (port 8080 by default). Vite dev server proxies `/api/*` to the editor server.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Run
 
-## React Compiler
+```bash
+# from repo root — terminal A
+make editor       # go run ./cmd/editor on :8080
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+# terminal B
+make web          # vite dev on :5173
+# or
+cd tools/editor-web && npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Open http://localhost:5173.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Test
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+cd tools/editor-web
+npm run test       # vitest unit (mapping, validation, layout, store, api client)
+npm run e2e        # playwright (requires both servers running)
+npm run build      # production bundle to dist/
 ```
+
+## Layout
+
+```
+src/
+  api/          typed fetch wrappers + zod schemas
+  state/        zustand editor store
+  bt/           JSON ↔ graph mapping, validation, dagre layout, custom React Flow nodes
+  components/   TopBar, StatesPanel, BTCanvas, Inspector, TuningDrawer
+  components/ui shadcn/ui primitives (button, badge, tabs, slider, ...)
+  lib/          cn() helper
+```
+
+## Stack
+
+| Layer | Lib |
+|---|---|
+| Framework | React 19 + Vite 8 + TypeScript |
+| Styling | Tailwind v3 + shadcn/ui (radix-nova style) |
+| Graph canvas | React Flow v11 + dagre auto-layout |
+| State | Zustand |
+| Forms | shadcn Field + radix primitives |
+| JSON viewer | @uiw/react-json-view |
+| Test | Vitest + @testing-library/react + Playwright |
+
+## Conventions
+
+- Semantic Tailwind tokens only (`bg-card`, `text-muted-foreground`, ...). No raw colors except in BT node components (preserve graph color coding).
+- Path alias `@/*` → `./src/*`
+- Forms via `<Field>` + `<FieldLabel htmlFor>` + control with matching `id`
+- shadcn upgrades: `npx shadcn@latest add --diff <component>` then merge per file
