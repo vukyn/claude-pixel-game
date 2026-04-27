@@ -7,6 +7,12 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { Checkbox } from '@/components/ui/checkbox'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Empty, EmptyHeader, EmptyTitle } from '@/components/ui/empty'
+import JsonView from '@uiw/react-json-view'
+import { darkTheme } from '@uiw/react-json-view/dark'
+import { Copy, Download, Maximize2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 type Tab = 'node' | 'state' | 'json'
 
@@ -32,11 +38,7 @@ export function Inspector() {
           <StateInspector />
         </TabsContent>
         <TabsContent value="json" className="flex-1 overflow-y-auto p-3">
-          {state ? (
-            <pre className="text-xs whitespace-pre-wrap bg-muted p-3 rounded border border-border">
-              {JSON.stringify(state.bt ?? state, null, 2)}
-            </pre>
-          ) : null}
+          <JsonInspector />
         </TabsContent>
       </Tabs>
     </aside>
@@ -219,6 +221,73 @@ function StateInspector() {
         </>
       )}
     </FieldGroup>
+  )
+}
+
+function JsonInspector() {
+  const behavior = useEditorStore(s => s.behavior)
+  const selectedStateId = useEditorStore(s => s.selectedStateId)
+  const state = behavior?.states.find(s => s.id === selectedStateId)
+  const [expanded, setExpanded] = useState(false)
+  if (!state) {
+    return (
+      <Empty>
+        <EmptyHeader>
+          <EmptyTitle>Select a state to view its JSON</EmptyTitle>
+        </EmptyHeader>
+      </Empty>
+    )
+  }
+  const data = (state.bt ?? state) as object
+  const text = JSON.stringify(data, null, 2)
+
+  const copy = () => navigator.clipboard.writeText(text)
+  const download = () => {
+    const blob = new Blob([text], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${behavior?.kind ?? 'behavior'}-${state.id}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  return (
+    <div className="flex flex-col gap-2 h-full min-h-0">
+      <TooltipProvider>
+        <div className="flex items-center justify-end gap-1">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" onClick={copy} aria-label="Copy JSON"><Copy /></Button>
+            </TooltipTrigger>
+            <TooltipContent>Copy</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" onClick={download} aria-label="Download JSON"><Download /></Button>
+            </TooltipTrigger>
+            <TooltipContent>Download</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" onClick={() => setExpanded(true)} aria-label="Expand JSON"><Maximize2 /></Button>
+            </TooltipTrigger>
+            <TooltipContent>Expand</TooltipContent>
+          </Tooltip>
+        </div>
+      </TooltipProvider>
+      <div className="flex-1 overflow-auto rounded border border-border bg-muted p-2 text-xs">
+        <JsonView value={data} style={darkTheme} collapsed={2} displayDataTypes={false} />
+      </div>
+      <Dialog open={expanded} onOpenChange={setExpanded}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-auto">
+          <DialogTitle>JSON: {state.id}</DialogTitle>
+          <div className="text-xs">
+            <JsonView value={data} style={darkTheme} collapsed={false} displayDataTypes={false} />
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
   )
 }
 
