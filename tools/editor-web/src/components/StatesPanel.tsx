@@ -1,3 +1,6 @@
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { useEditorStore } from '../state/editorStore'
 
 export function StatesPanel() {
@@ -6,26 +9,26 @@ export function StatesPanel() {
   const selectState = useEditorStore(s => s.selectState)
   if (!behavior) return null
   return (
-    <aside className="w-60 border-r border-[#3a4150] bg-[#232831] flex flex-col">
-      <div className="px-3 py-2 text-[11px] uppercase tracking-wide text-[#8a93a3] border-b border-[#3a4150] font-semibold">
+    <aside className="w-60 border-r border-border bg-card flex flex-col">
+      <div className="px-3 py-2 text-[11px] uppercase tracking-wide text-muted-foreground border-b border-border font-semibold">
         States
       </div>
-      <div className="flex-1 overflow-y-auto p-1">
-        {behavior.states.map(s => (
-          <button
-            key={s.id}
-            onClick={() => selectState(s.id)}
-            className={`w-full text-left px-2 py-2 rounded text-sm flex items-center justify-between ${
-              selectedStateId === s.id ? 'bg-[#5aa3f0] text-white' : 'hover:bg-[#2c3340]'
-            }`}
-          >
-            <span>{s.id}</span>
-            <span className="flex gap-1">
-              {s.decision && <span className="text-[9px] px-1.5 py-0.5 rounded-full border border-[#7ed957] text-[#7ed957]">BT</span>}
-            </span>
-          </button>
-        ))}
-      </div>
+      <ScrollArea className="flex-1">
+        <div className="p-1 flex flex-col gap-0.5">
+          {behavior.states.map(s => (
+            <Button
+              key={s.id}
+              variant={selectedStateId === s.id ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => selectState(s.id)}
+              className="w-full justify-between"
+            >
+              {s.id}
+              {s.decision && <Badge variant="outline" className="text-emerald-500 border-emerald-500/40">BT</Badge>}
+            </Button>
+          ))}
+        </div>
+      </ScrollArea>
     </aside>
   )
 }
