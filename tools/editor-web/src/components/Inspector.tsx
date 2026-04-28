@@ -18,10 +18,7 @@ type Tab = 'node' | 'state' | 'json'
 
 export function Inspector() {
   const [tab, setTab] = useState<Tab>('node')
-  const behavior = useEditorStore(s => s.behavior)
-  const selectedStateId = useEditorStore(s => s.selectedStateId)
   const selectedNodePath = useEditorStore(s => s.selectedNodePath)
-  const state = behavior?.states.find(s => s.id === selectedStateId)
 
   return (
     <aside className="w-72 border-l border-border bg-card flex flex-col">

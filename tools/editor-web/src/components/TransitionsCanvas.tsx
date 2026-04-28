@@ -9,7 +9,7 @@ import { Empty, EmptyHeader, EmptyTitle } from '@/components/ui/empty'
 import { useEditorStore } from '../state/editorStore'
 import { extractTransitions } from '../bt/transitions'
 import { layout } from '../bt/layout'
-import type { FlowEdge, FlowNode } from '../bt/types'
+import type { FlowEdge } from '../bt/types'
 
 interface Props {
   onJumpToState?(): void
@@ -31,9 +31,9 @@ export function TransitionsCanvas({ onJumpToState }: Props) {
   const { nodes, edges } = useMemo(() => {
     if (!behavior) return { nodes: [] as Node[], edges: [] as Edge[] }
     const g = extractTransitions(behavior, registry)
-    const flowNodes: FlowNode[] = g.nodes.map(n => ({
+    const flowNodes = g.nodes.map(n => ({
       id: n.id,
-      type: 'state',
+      type: 'state' as const,
       data: { label: n.id, isInitial: n.isInitial, isDead: n.id === '__dead' },
       position: { x: 0, y: 0 },
     }))
