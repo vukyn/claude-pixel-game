@@ -195,10 +195,10 @@ export function BTCanvas() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="size-8 bg-transparent hover:bg-transparent text-muted-foreground hover:text-foreground"
+                    className="size-7 bg-transparent hover:bg-transparent text-foreground hover:text-primary"
                     aria-label="Canvas controls help"
                   >
-                    <HelpCircle className="size-5" />
+                    <HelpCircle className="size-4" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" align="end" className="max-w-md text-left">
