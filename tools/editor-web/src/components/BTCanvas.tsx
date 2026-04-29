@@ -157,6 +157,11 @@ export function BTCanvas() {
           }}
           onNodesChange={onNodesChange}
           panOnDrag={mode === 'hand' ? [1, 2] : false}
+          panOnScroll
+          panActivationKeyCode="Space"
+          zoomOnScroll={false}
+          zoomOnPinch
+          zoomActivationKeyCode={['Meta', 'Control']}
           selectionOnDrag={mode === 'select'}
           nodesDraggable
           fitView
