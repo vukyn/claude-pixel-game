@@ -11,7 +11,7 @@ import ReactFlow, {
   type NodeChange,
 } from 'reactflow'
 import 'reactflow/dist/style.css'
-import { Hand, MousePointer2, Plus } from 'lucide-react'
+import { Hand, HelpCircle, MousePointer2, Plus } from 'lucide-react'
 import {
   Empty, EmptyHeader, EmptyTitle,
 } from '@/components/ui/empty'
@@ -20,6 +20,10 @@ import { Button } from '@/components/ui/button'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
+} from '@/components/ui/tooltip'
+import { CanvasHelp } from './CanvasHelp'
 import { useEditorStore } from '../state/editorStore'
 import { toGraph } from '../bt/mapping'
 import { layout } from '../bt/layout'
@@ -170,7 +174,7 @@ export function BTCanvas() {
           <Background gap={24} />
           <MiniMap pannable zoomable style={{ width: 140, height: 90 }} />
           <Controls />
-          <Panel position="top-right">
+          <Panel position="top-right" className="flex items-center gap-2">
             <ToggleGroup
               type="single"
               value={mode}
@@ -185,6 +189,23 @@ export function BTCanvas() {
                 <MousePointer2 />
               </ToggleGroupItem>
             </ToggleGroup>
+            <TooltipProvider delayDuration={150}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="size-8"
+                    aria-label="Canvas controls help"
+                  >
+                    <HelpCircle className="size-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" align="end" className="max-w-md text-left">
+                  <CanvasHelp />
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </Panel>
         </ReactFlow>
       </ReactFlowProvider>
