@@ -245,7 +245,7 @@ func (g *Game) Update() error {
 			}
 			g.toast.Show(msg, 4*time.Second)
 		} else {
-			g.toast.Show(fmt.Sprintf("Behaviors reloaded ✓ (%d)", succeeded), 2500*time.Millisecond)
+			g.toast.Show(fmt.Sprintf("Behaviors reloaded (%d)", succeeded), 2500*time.Millisecond)
 		}
 	}
 
