@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import ReactFlow, {
   Background, Controls, MiniMap, ReactFlowProvider,
+  Handle, Position,
   MarkerType,
   type Edge, type Node,
 } from 'reactflow'
@@ -15,11 +16,20 @@ interface Props {
   onJumpToState?(): void
 }
 
+// Handles are invisible but required for React Flow to anchor edges correctly (LR layout).
+const invisibleHandle = { background: 'transparent', border: 'none', width: 0, height: 0 }
+
 function StateNode({ data }: { data: { label: string; isInitial: boolean; isDead: boolean } }) {
   const cls = data.isDead
     ? 'rounded-full bg-muted text-muted-foreground border border-border px-3 py-1 text-xs'
     : `rounded-md bg-card border ${data.isInitial ? 'border-emerald-500' : 'border-border'} px-3 py-2 text-sm shadow`
-  return <div className={cls}>{data.label}</div>
+  return (
+    <div className={cls}>
+      <Handle type="target" position={Position.Left} style={invisibleHandle} />
+      {data.label}
+      <Handle type="source" position={Position.Right} style={invisibleHandle} />
+    </div>
+  )
 }
 const nodeTypes = { state: StateNode }
 

@@ -32,7 +32,7 @@ export function WaitNode({ id, selected, data }: NodeProps) {
 
   return (
     <ContextMenu>
-      <ContextMenuTrigger asChild>
+      <ContextMenuTrigger>
         {visual}
       </ContextMenuTrigger>
       <ContextMenuContent>

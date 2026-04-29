@@ -40,7 +40,7 @@ export function ConditionNode({ id, selected, data }: NodeProps) {
 
   return (
     <ContextMenu>
-      <ContextMenuTrigger asChild>
+      <ContextMenuTrigger>
         {visual}
       </ContextMenuTrigger>
       <ContextMenuContent>

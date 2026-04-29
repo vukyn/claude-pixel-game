@@ -52,10 +52,14 @@ export function NodeContextMenu({ kind, node, isRoot, registry, actions }: Props
       {convertOptions.length > 0 && (
         <ConvertCascade kind={kind} options={convertOptions} onConvert={actions.onConvert!} />
       )}
-      <Sep kind={kind} />
-      <Item kind={kind} disabled={isRoot} onSelect={() => actions.onDelete?.()} className="text-destructive">
-        Delete
-      </Item>
+      {!isRoot && (
+        <>
+          <Sep kind={kind} />
+          <Item kind={kind} onSelect={() => actions.onDelete?.()} className="text-destructive">
+            Delete
+          </Item>
+        </>
+      )}
     </>
   )
 }

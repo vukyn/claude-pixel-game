@@ -33,7 +33,7 @@ export function SequenceNode({ id, selected }: NodeProps) {
 
   return (
     <ContextMenu>
-      <ContextMenuTrigger asChild>
+      <ContextMenuTrigger>
         {visual}
       </ContextMenuTrigger>
       <ContextMenuContent>
