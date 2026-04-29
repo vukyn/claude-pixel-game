@@ -2,7 +2,7 @@ function Kbd({ children }: { children: React.ReactNode }) {
   return (
     <kbd
       data-slot="kbd"
-      className="inline-flex items-center justify-center rounded-sm border border-background/30 bg-background/15 px-1 py-0.5 font-mono text-[10px] leading-none"
+      className="inline-flex items-center justify-center rounded-sm border border-border bg-muted px-1 py-0.5 font-mono text-[10px] leading-none text-foreground"
     >
       {children}
     </kbd>
@@ -17,7 +17,7 @@ interface Row {
 function Section({ title, rows }: { title: string; rows: Row[] }) {
   return (
     <div className="flex flex-col gap-1">
-      <div className="text-[10px] uppercase tracking-wider opacity-60">{title}</div>
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{title}</div>
       <table className="w-full border-collapse text-[11px] leading-snug">
         <tbody>
           {rows.map((r, i) => (
@@ -25,7 +25,7 @@ function Section({ title, rows }: { title: string; rows: Row[] }) {
               <td className="whitespace-nowrap py-0.5 pr-3 align-top">
                 <span className="flex flex-wrap items-center gap-1">{r.keys}</span>
               </td>
-              <td className="py-0.5 align-top opacity-90">{r.desc}</td>
+              <td className="py-0.5 align-top text-foreground/90">{r.desc}</td>
             </tr>
           ))}
         </tbody>

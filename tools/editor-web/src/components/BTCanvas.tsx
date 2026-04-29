@@ -21,8 +21,8 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import {
-  Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
-} from '@/components/ui/tooltip'
+  Popover, PopoverContent, PopoverTrigger,
+} from '@/components/ui/popover'
 import { CanvasHelp } from './CanvasHelp'
 import { useEditorStore } from '../state/editorStore'
 import { toGraph } from '../bt/mapping'
@@ -189,23 +189,25 @@ export function BTCanvas() {
                 <MousePointer2 />
               </ToggleGroupItem>
             </ToggleGroup>
-            <TooltipProvider delayDuration={150}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-7 bg-transparent hover:bg-transparent text-foreground hover:text-primary"
-                    aria-label="Canvas controls help"
-                  >
-                    <HelpCircle className="size-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" align="end" className="max-w-md text-left">
-                  <CanvasHelp />
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-7 bg-transparent hover:bg-transparent text-foreground hover:text-primary"
+                  aria-label="Canvas controls help"
+                >
+                  <HelpCircle className="size-4" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent
+                side="bottom"
+                align="end"
+                className="w-[28rem] max-h-[70vh] overflow-y-auto p-3"
+              >
+                <CanvasHelp />
+              </PopoverContent>
+            </Popover>
           </Panel>
         </ReactFlow>
       </ReactFlowProvider>
