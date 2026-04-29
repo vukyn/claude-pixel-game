@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import ReactFlow, {
+  applyNodeChanges,
   Background,
   Controls,
   MiniMap,
@@ -7,6 +8,7 @@ import ReactFlow, {
   ReactFlowProvider,
   type Edge,
   type Node,
+  type NodeChange,
 } from 'reactflow'
 import 'reactflow/dist/style.css'
 import { Hand, MousePointer2, Plus } from 'lucide-react'
@@ -70,12 +72,12 @@ export function BTCanvas() {
     updateBT(setRoot(rootType, opts))
   }
 
-  const { nodes, edges } = useMemo(() => {
-    if (!state?.bt) return { nodes: [] as Node[], edges: [] as Edge[] }
+  const { layoutNodes, edges } = useMemo(() => {
+    if (!state?.bt) return { layoutNodes: [] as Node[], edges: [] as Edge[] }
     const { nodes, edges } = toGraph(state.bt as BTNode)
     const laid = layout(nodes, edges)
     return {
-      nodes: laid.map((n) => ({ id: n.id, type: n.type, data: n.data, position: n.position })),
+      layoutNodes: laid.map((n) => ({ id: n.id, type: n.type, data: n.data, position: n.position })),
       edges: edges.map((e) => ({
         id: e.id,
         source: e.source,
@@ -84,7 +86,18 @@ export function BTCanvas() {
         data: e.data,
       })),
     }
-  }, [state])
+  }, [state?.bt])
+
+  const [nodes, setNodes] = useState<Node[]>(layoutNodes)
+
+  // Reset positions whenever the BT structure changes (new layout)
+  useEffect(() => {
+    setNodes(layoutNodes)
+  }, [layoutNodes])
+
+  const onNodesChange = (changes: NodeChange[]) => {
+    setNodes((nds) => applyNodeChanges(changes, nds))
+  }
 
   if (!state)
     return (
@@ -142,7 +155,8 @@ export function BTCanvas() {
             if (!node) return
             setMenu({ x: e.clientX, y: e.clientY, target: { kind: 'node', path: n.id, node } })
           }}
-          panOnDrag={mode === 'hand'}
+          onNodesChange={onNodesChange}
+          panOnDrag={mode === 'hand' ? [1, 2] : false}
           selectionOnDrag={mode === 'select'}
           nodesDraggable
           fitView
