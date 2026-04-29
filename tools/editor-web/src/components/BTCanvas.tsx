@@ -193,12 +193,12 @@ export function BTCanvas() {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="icon"
-                    className="size-8"
+                    className="size-8 bg-transparent hover:bg-transparent text-muted-foreground hover:text-foreground"
                     aria-label="Canvas controls help"
                   >
-                    <HelpCircle className="size-4" />
+                    <HelpCircle className="size-5" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" align="end" className="max-w-md text-left">
