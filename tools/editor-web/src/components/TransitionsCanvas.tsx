@@ -97,7 +97,8 @@ export function TransitionsCanvas({ onJumpToState }: Props) {
         elementsSelectable
         fitView
         onNodeClick={(_, n) => {
-          selectState(n.id === '__dead' ? null : n.id)
+          if (n.id === '__dead') return
+          selectState(n.id)
           onJumpToState?.()
         }}
       >
