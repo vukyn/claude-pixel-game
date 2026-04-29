@@ -31,6 +31,10 @@ const initial = {
   validation: { valid: true, errors: [] } as ValidationResult,
 }
 
+// Module-level timestamp for undo coalescing; reset on load/test-reset.
+let _lastUndoPushTime = 0
+const COALESCE_MS = 400
+
 export const useEditorStore = create<EditorState>()(
   temporal(
     (set, get) => ({
@@ -43,6 +47,7 @@ export const useEditorStore = create<EditorState>()(
         const validation = validateLocal(behavior, kind, registry)
         set({ currentKind: kind, behavior, lastSaved: behavior, dirty: false, registry, validation })
         useEditorStore.temporal.getState().clear()
+        _lastUndoPushTime = 0
       },
       async save() {
         const s = get()
@@ -67,6 +72,16 @@ export const useEditorStore = create<EditorState>()(
       partialize: (s) => ({ behavior: s.behavior }) as Partial<EditorState>,
       limit: 50,
       equality: (a, b) => (a as { behavior: unknown }).behavior === (b as { behavior: unknown }).behavior,
+      handleSet: (handleSet) => (pastState, replace, currentState, deltaState) => {
+        const now = Date.now()
+        if (now - _lastUndoPushTime < COALESCE_MS) {
+          // Within burst window: skip push, extend window
+          _lastUndoPushTime = now
+          return
+        }
+        handleSet(pastState, replace, currentState, deltaState)
+        _lastUndoPushTime = now
+      },
     }
   )
 )
@@ -83,4 +98,5 @@ useEditorStore.temporal.subscribe(() => {
 export function __resetForTest() {
   useEditorStore.setState({ ...initial })
   useEditorStore.temporal.getState().clear()
+  _lastUndoPushTime = 0
 }
