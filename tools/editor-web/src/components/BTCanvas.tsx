@@ -22,9 +22,8 @@ import { useEditorStore } from '../state/editorStore'
 import { toGraph } from '../bt/mapping'
 import { layout } from '../bt/layout'
 import type { BTNode, BTNodeType } from '../bt/types'
-import { addChild, convertAt, deleteAt, setRoot } from '../state/btMutations'
+import { addChild, convertAt, deleteAt, setRoot, readAtPath } from '../state/btMutations'
 import { NodeContextMenu } from './NodeContextMenu'
-import { NodeMenuContext, type NodeMenuApi } from '../bt/nodes/menuContext'
 import { SelectorNode } from '../bt/nodes/SelectorNode'
 import { SequenceNode } from '../bt/nodes/SequenceNode'
 import { ChanceNode } from '../bt/nodes/ChanceNode'
@@ -43,6 +42,10 @@ const nodeTypes = {
 
 type CanvasMode = 'hand' | 'select'
 
+type MenuTarget =
+  | { kind: 'node'; path: string; node: BTNode }
+  | { kind: 'pane' }
+
 export function BTCanvas() {
   const behavior = useEditorStore((s) => s.behavior)
   const registry = useEditorStore((s) => s.registry)
@@ -51,6 +54,7 @@ export function BTCanvas() {
   const selectNode = useEditorStore((s) => s.selectNode)
   const state = behavior?.states.find((s) => s.id === selectedStateId)
   const [mode, setMode] = useState<CanvasMode>('hand')
+  const [menu, setMenu] = useState<{ x: number; y: number; target: MenuTarget } | null>(null)
 
   const updateBT = (nextBT: BTNode | null) => {
     if (!behavior || !selectedStateId) return
@@ -61,23 +65,6 @@ export function BTCanvas() {
       ),
     })
   }
-
-  const api: NodeMenuApi = useMemo(() => ({
-    registry,
-    onAddChild: (path, child) => {
-      if (!state?.bt) return
-      updateBT(addChild(state.bt as BTNode, path, child))
-    },
-    onConvert: (path, toType) => {
-      if (!state?.bt) return
-      updateBT(convertAt(state.bt as BTNode, path, toType))
-    },
-    onDelete: (path) => {
-      if (!state?.bt) return
-      if (path === 'root') return
-      updateBT(deleteAt(state.bt as BTNode, path))
-    },
-  }), [state, behavior, registry])
 
   const onSetRoot = (rootType: BTNodeType, opts?: { name?: string }) => {
     updateBT(setRoot(rootType, opts))
@@ -141,13 +128,20 @@ export function BTCanvas() {
   }
 
   return (
-    <NodeMenuContext.Provider value={api}>
+    <>
       <ReactFlowProvider>
         <ReactFlow
           nodes={nodes}
           edges={edges}
           nodeTypes={nodeTypes}
           onNodeClick={(_, n) => selectNode(n.id)}
+          onNodeContextMenu={(e, n) => {
+            e.preventDefault()
+            if (!state?.bt) return
+            const node = readAtPath(state.bt as BTNode, n.id)
+            if (!node) return
+            setMenu({ x: e.clientX, y: e.clientY, target: { kind: 'node', path: n.id, node } })
+          }}
           panOnDrag={mode === 'hand'}
           selectionOnDrag={mode === 'select'}
           nodesDraggable
@@ -175,6 +169,40 @@ export function BTCanvas() {
           </Panel>
         </ReactFlow>
       </ReactFlowProvider>
-    </NodeMenuContext.Provider>
+
+      {menu && menu.target.kind === 'node' && (() => {
+        const t = menu.target
+        return (
+          <DropdownMenu open onOpenChange={(o) => !o && setMenu(null)}>
+            <DropdownMenuTrigger asChild>
+              <div style={{ position: 'fixed', left: menu.x, top: menu.y, width: 0, height: 0 }} />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" sideOffset={0}>
+              <NodeContextMenu
+                kind="dropdown"
+                node={t.node}
+                isRoot={t.path === 'root'}
+                registry={registry}
+                actions={{
+                  onAddChild: (c) => {
+                    updateBT(addChild(state.bt as BTNode, t.path, c))
+                    setMenu(null)
+                  },
+                  onConvert: (type) => {
+                    updateBT(convertAt(state.bt as BTNode, t.path, type))
+                    setMenu(null)
+                  },
+                  onDelete: () => {
+                    if (t.path === 'root') return
+                    updateBT(deleteAt(state.bt as BTNode, t.path))
+                    setMenu(null)
+                  },
+                }}
+              />
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )
+      })()}
+    </>
   )
 }
