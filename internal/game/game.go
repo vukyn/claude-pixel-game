@@ -1,6 +1,7 @@
 package game
 
 import (
+	"fmt"
 	"image/color"
 	"log"
 	"math"
@@ -63,6 +64,7 @@ type Game struct {
 	hud               *hud.HUD
 	gameOver          *hud.GameOver
 	pause             *hud.Pause
+	toast             *hud.Toast
 	mode              Mode
 	hitboxDebug       bool
 	lastIntent        input.Intent
@@ -164,6 +166,7 @@ func New(d Deps) *Game {
 	)
 	g.gameOver = hud.NewGameOver(d.OverTitle, d.OverSubtitle, d.Cfg.WindowW, d.Cfg.WindowH)
 	g.pause = hud.NewPause(d.OverTitle, d.OverSubtitle, d.Cfg.WindowW, d.Cfg.WindowH)
+	g.toast = hud.NewToast(d.OverSubtitle, d.Cfg.WindowW)
 
 	return g
 }
@@ -221,10 +224,28 @@ func (g *Game) Update() error {
 		g.hitboxDebug = !g.hitboxDebug
 	}
 	if inpututil.IsKeyJustPressed(ebiten.KeyF5) {
+		var firstErr error
+		failed := ""
+		succeeded := 0
 		for _, k := range g.kinds {
 			if err := enemy.ReloadBehavior(k, g.anims); err != nil {
 				log.Printf("behavior reload failed for %q: %v", k.Name, err)
+				if firstErr == nil {
+					firstErr = err
+					failed = k.Name
+				}
+			} else {
+				succeeded++
 			}
+		}
+		if firstErr != nil {
+			msg := fmt.Sprintf("Reload failed (%s): %v", failed, firstErr)
+			if len(msg) > 80 {
+				msg = msg[:77] + "..."
+			}
+			g.toast.Show(msg, 4*time.Second)
+		} else {
+			g.toast.Show(fmt.Sprintf("Behaviors reloaded (%d)", succeeded), 2500*time.Millisecond)
 		}
 	}
 
@@ -399,6 +420,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	if g.mode == ModeGameOver {
 		g.gameOver.Draw(screen)
 	}
+
+	g.toast.Draw(screen)
 }
 
 func (g *Game) drawPlayer(screen *ebiten.Image) {

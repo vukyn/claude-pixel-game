@@ -2,7 +2,7 @@ import { Handle, Position, type NodeProps } from 'reactflow'
 
 function summarizeArgs(name: string, args: Record<string, unknown> | undefined): string {
   if (!args || Object.keys(args).length === 0) return name
-  if (name === 'goto') return `goto → ${args.state ?? '?'}`
+  if (name === 'goto') return `goto -> ${args.state ?? '?'}`
   const pairs = Object.entries(args).map(([k, v]) => `${k}=${v}`).join(', ')
   return `${name}(${pairs})`
 }
