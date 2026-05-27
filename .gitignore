@@ -29,3 +29,9 @@ venv/
 /tune
 /game
 /editor
+
+# AI training artifacts
+ai/checkpoints/
+ai/logs/
+__pycache__/
+*.pyc
