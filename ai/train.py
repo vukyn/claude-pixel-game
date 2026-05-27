@@ -6,7 +6,7 @@ import time
 
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import CheckpointCallback, BaseCallback
-from stable_baselines3.common.env_util import make_vec_env
+from stable_baselines3.common.vec_env import DummyVecEnv
 
 from config import PPO_PARAMS, CHECKPOINT_INTERVAL, BASE_PORT
 from env import PixelGameEnv
@@ -52,10 +52,10 @@ def main():
         )
         time.sleep(3)
 
+    vec_env = None
     try:
-        vec_env = make_vec_env(PixelGameEnv, n_envs=args.envs, env_kwargs=[
-            {"port": BASE_PORT + i} for i in range(args.envs)
-        ])
+        env_fns = [lambda p=BASE_PORT + i: PixelGameEnv(port=p) for i in range(args.envs)]
+        vec_env = DummyVecEnv(env_fns)
 
         if args.resume:
             print(f"Resuming from {args.resume}")
@@ -87,7 +87,8 @@ def main():
         print("Training complete. Saved to checkpoints/ppo_final.zip")
 
     finally:
-        vec_env.close()
+        if vec_env is not None:
+            vec_env.close()
         if server_proc:
             server_proc.terminate()
             server_proc.wait()
