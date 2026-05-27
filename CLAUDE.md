@@ -62,7 +62,7 @@ make tune ARGS="list"
 
 Output: tabwriter table `KEY VALUE MIN MAX UNIT DESCRIPTION`.
 
-Current keys (26):
+Current keys (27):
 
 Physics (6):
 | Key | Unit | Effect |
@@ -101,6 +101,11 @@ Combat + enemy (17):
 | `enemy_spawn_min_s` | s | Minimum enemy spawn interval (all kinds) |
 | `enemy_spawn_max_s` | s | Maximum enemy spawn interval (all kinds) |
 | `enemy_max_alive` | — | Concurrent enemy cap across all kinds (default 3) |
+
+Game (1):
+| Key | Unit | Effect |
+|---|---|---|
+| `game_timeout_s` | s | Game duration before time-up screen (default 30) |
 
 ### Update one parameter
 

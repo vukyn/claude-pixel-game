@@ -81,7 +81,10 @@ INSERT INTO tuning (key, value, min_value, max_value, unit, description) VALUES
     -- spawner (all kinds)
     ('enemy_spawn_min_s',  3, 1, 60, 's', 'minimum enemy spawn interval (all kinds)'),
     ('enemy_spawn_max_s', 10, 1, 60, 's', 'maximum enemy spawn interval (all kinds)'),
-    ('enemy_max_alive',    3, 1, 10, '',  'max concurrent enemies (all kinds)');
+    ('enemy_max_alive',    3, 1, 10, '',  'max concurrent enemies (all kinds)'),
+
+    -- game
+    ('game_timeout_s', 30, 5, 300, 's', 'game duration before time-up screen');
 
 -- ============================================================================
 -- hitboxes
@@ -108,4 +111,5 @@ INSERT INTO hud_layout (key, x, y, w, h, anchor, scale) VALUES
     ('heart',       70, 16, 16, 16, 'top_right',  2.0),
     ('lives_text',  16, 16,  0,  0, 'top_right',  1.0),
     ('score_text',  16, 16,  0,  0, 'top_left',   1.0),
-    ('stamina_bar', 16, 48, 48, 16, 'top_left',   2.0);
+    ('stamina_bar', 16, 48, 48, 16, 'top_left',   2.0),
+    ('timer_text',   0, 16,  0,  0, 'top_left',   1.0);
