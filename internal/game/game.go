@@ -272,30 +272,23 @@ type aiActionMsg struct {
 	Action int    `json:"action"`
 }
 
-func (g *Game) aiPollAction() input.Intent {
-	obs := g.aiObserve()
-	msg := aiObsMsg{Type: "obs", Obs: obs[:], Reward: 0, Done: false}
-	data, _ := json.Marshal(msg)
-	g.aiWriter.Write(data)
-	g.aiWriter.WriteByte('\n')
-	g.aiWriter.Flush()
-
+func (g *Game) aiReadMsg() (string, int) {
 	line, err := g.aiReader.ReadBytes('\n')
 	if err != nil {
 		log.Printf("AI: read error: %v", err)
-		return input.Intent{}
+		return "", 0
 	}
-	var action aiActionMsg
-	if err := json.Unmarshal(line, &action); err != nil {
+	var msg aiActionMsg
+	if err := json.Unmarshal(line, &msg); err != nil {
 		log.Printf("AI: unmarshal error: %v", err)
-		return input.Intent{}
+		return "", 0
 	}
-	return aienv.ToIntent(action.Action)
+	return msg.Type, msg.Action
 }
 
-func (g *Game) aiSendDone() {
+func (g *Game) aiSendObs(reward float64, done bool) {
 	obs := g.aiObserve()
-	msg := aiObsMsg{Type: "obs", Obs: obs[:], Reward: 0, Done: true, Info: map[string]interface{}{
+	msg := aiObsMsg{Type: "obs", Obs: obs[:], Reward: reward, Done: done, Info: map[string]interface{}{
 		"score":   g.score.Total(),
 		"lives":   g.player.Lives,
 		"elapsed": g.elapsedS,
@@ -304,18 +297,6 @@ func (g *Game) aiSendDone() {
 	g.aiWriter.Write(data)
 	g.aiWriter.WriteByte('\n')
 	g.aiWriter.Flush()
-}
-
-func (g *Game) aiWaitReset() {
-	line, err := g.aiReader.ReadBytes('\n')
-	if err != nil {
-		log.Printf("AI: read error waiting for reset: %v", err)
-		return
-	}
-	var msg aiActionMsg
-	json.Unmarshal(line, &msg)
-	g.reset()
-	g.mode = ModePlaying
 }
 
 func (g *Game) aiObserve() [aienv.ObsSize]float64 {
@@ -431,8 +412,12 @@ func (g *Game) Update() error {
 
 	if g.mode == ModeGameOver || g.mode == ModeTimeOut {
 		if g.aiConn != nil {
-			g.aiSendDone()
-			g.aiWaitReset()
+			msgType, _ := g.aiReadMsg()
+			if msgType == "reset" {
+				g.reset()
+				g.mode = ModePlaying
+				g.aiSendObs(0, false)
+			}
 			return nil
 		}
 		if inpututil.IsKeyJustPressed(ebiten.KeyR) {
@@ -451,7 +436,13 @@ func (g *Game) Update() error {
 
 	var intent input.Intent
 	if g.aiConn != nil {
-		intent = g.aiPollAction()
+		msgType, action := g.aiReadMsg()
+		if msgType == "reset" {
+			g.reset()
+			g.aiSendObs(0, false)
+			return nil
+		}
+		intent = aienv.ToIntent(action)
 	} else {
 		intent = input.Poll()
 	}
@@ -530,6 +521,15 @@ func (g *Game) Update() error {
 
 	if g.player.FSM.CurrentID() == player.StateDeath && g.player.Current != nil && g.player.Current.Done() {
 		g.mode = ModeGameOver
+	}
+
+	if g.aiConn != nil {
+		done := g.mode == ModeGameOver || g.mode == ModeTimeOut
+		reward := 0.0
+		if done {
+			reward = -50.0
+		}
+		g.aiSendObs(reward, done)
 	}
 
 	return nil

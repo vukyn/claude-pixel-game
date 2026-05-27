@@ -26,7 +26,7 @@ web-build:
 
 # === AI Training ===
 
-.PHONY: ai-setup train-server train train-resume train-eval train-play train-tensorboard train-clean
+.PHONY: ai-setup train-server train train-resume train-visual train-eval train-play train-tensorboard train-clean
 
 ai-setup:              ## Install Python dependencies for AI training
 	cd ai && pip install -r requirements.txt
@@ -39,6 +39,13 @@ train:                 ## Train PPO agent (STEPS=1000000 default, ENVS=4 default
 
 train-resume:          ## Resume training from latest checkpoint (STEPS=500000 default)
 	cd ai && python3 train.py --resume checkpoints/ppo_latest.zip --timesteps=$(or $(STEPS),500000)
+
+train-visual:          ## Train with game window visible (slower, 60fps, STEPS=50000 default)
+	@echo "Training with visual — game window will open..."
+	@echo "Close game window or Ctrl+C to stop."
+	go run ./cmd/game -- -ai 9876 &
+	@sleep 2
+	cd ai && python3 train.py --timesteps=$(or $(STEPS),50000) --envs=1
 
 train-eval:            ## Evaluate trained model over 100 episodes
 	cd ai && python3 eval.py --model checkpoints/ppo_final.zip --episodes=$(or $(EPISODES),100)
