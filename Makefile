@@ -62,3 +62,19 @@ train-tensorboard:     ## Open TensorBoard dashboard for training metrics
 
 train-clean:           ## Remove all checkpoints and training logs
 	rm -rf ai/checkpoints/ ai/logs/
+
+# === Orc AI Training ===
+
+.PHONY: train-orc-server train-orc train-orc-visual
+
+train-orc-server:      ## Start headless server for orc RL training
+	go run ./cmd/train-orc -port=9876
+
+train-orc:             ## Train orc RL agent vs player model (STEPS=500000 default)
+	cd ai && python3 train_orc.py --timesteps=$(or $(STEPS),500000) --player-model=$(or $(PLAYER_MODEL),checkpoints/ppo_final.zip)
+
+train-orc-visual:      ## Train orc with game window visible (STEPS=50000 default)
+	@echo "Training orc with visual — game window will open..."
+	go run ./cmd/game -ai-orc 9876 &
+	@sleep 2
+	cd ai && python3 train_orc.py --timesteps=$(or $(STEPS),50000) --player-model=$(or $(PLAYER_MODEL),checkpoints/ppo_final.zip)
