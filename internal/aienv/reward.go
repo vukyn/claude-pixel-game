@@ -36,18 +36,18 @@ func CalcRewardScaled(in RewardInput, shapedScale float64) float64 {
 
 	shaped := 0.0
 	if in.HitsLanded > 0 {
-		shaped += float64(in.HitsLanded) * 2.0
+		shaped += float64(in.HitsLanded) * 5.0
 	}
 	if in.AttackWhiffed {
-		shaped += -0.5
+		shaped += -0.2
 	}
 	if in.JumpedNoReason {
-		shaped += -0.3
+		shaped += -0.15
 	}
 	if in.DistDelta < 0 {
-		shaped += 0.5
+		shaped += 0.3
 	} else if in.DistDelta > 0 {
-		shaped += -0.2
+		shaped += -0.1
 	}
 
 	reward += shaped * shapedScale
