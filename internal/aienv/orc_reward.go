@@ -13,24 +13,24 @@ type OrcRewardInput struct {
 func OrcCalcReward(in OrcRewardInput) float64 {
 	reward := 0.0
 
-	reward += float64(in.HitPlayer) * 8.0
+	reward += float64(in.HitPlayer) * 15.0
 
 	if in.PlayerDied {
-		reward += 20.0
+		reward += 30.0
 		return reward
 	}
 
-	reward += float64(in.OrcLivesLost) * -5.0
+	reward += float64(in.OrcLivesLost) * -2.0
 
 	if in.OrcDied {
-		reward += -15.0
+		reward += -5.0
 		return reward
 	}
 
 	reward += 0.01
 
 	if in.DodgeSuccess {
-		reward += 3.0
+		reward += 1.0
 	}
 	if in.Stagnant {
 		reward += -0.3
