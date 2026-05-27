@@ -15,17 +15,17 @@ import (
 func (e *Enemy) Tick(dt time.Duration) {
 	// 1. Event transitions (bypass BT).
 	if e.Lives <= 0 && e.CurrentState != "death" {
-		e.transition("death")
+		e.Transition("death")
 		return
 	}
 	if e.OnHitPending {
 		e.OnHitPending = false
-		e.transition("hurt")
+		e.Transition("hurt")
 		return
 	}
 	if e.CurrentState == "fall" && e.Grounded {
 		e.runOnExitActionsFor(e.states[e.CurrentState])
-		e.transition("run")
+		e.Transition("run")
 		return
 	}
 
@@ -53,7 +53,7 @@ func (e *Enemy) Tick(dt time.Duration) {
 				return
 			}
 			if st.Next != "" {
-				e.transition(st.Next)
+				e.Transition(st.Next)
 			}
 		}
 		return
@@ -67,11 +67,11 @@ func (e *Enemy) Tick(dt time.Duration) {
 	st.BT.Root.Tick(ctx)
 	e.BranchTag = ctx.BranchTag
 	if ctx.PendingGoto != "" && ctx.PendingGoto != e.CurrentState {
-		e.transition(ctx.PendingGoto)
+		e.Transition(ctx.PendingGoto)
 	}
 }
 
-func (e *Enemy) transition(to string) {
+func (e *Enemy) Transition(to string) {
 	st, ok := e.states[to]
 	if !ok {
 		return
