@@ -19,7 +19,8 @@ import (
 )
 
 func main() {
-	aiPort := flag.Int("ai", 0, "AI control port (0 = keyboard)")
+	aiPort := flag.Int("ai", 0, "AI control port for player only (0 = keyboard)")
+	aiBothPort := flag.Int("ai-both", 0, "AI control port for player+orc (0 = disabled)")
 	flag.Parse()
 
 	cfg := config.Load()
@@ -146,6 +147,7 @@ func main() {
 		Layout:        layout,
 		TimeoutS:      timeoutS,
 		AIPort:        *aiPort,
+		AIBothPort:    *aiBothPort,
 	})
 
 	ebiten.SetWindowSize(cfg.WindowW, cfg.WindowH)

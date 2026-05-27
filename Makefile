@@ -73,9 +73,10 @@ train-orc-server:      ## Start headless server for orc RL training
 train-orc:             ## Train orc RL agent vs player model (STEPS=500000 default)
 	cd ai && python3 train_orc.py --timesteps=$(or $(STEPS),500000) --player-model=$(or $(PLAYER_MODEL),checkpoints/ppo_final.zip)
 
-play-both:             ## Watch player AI vs orc AI battle (headless server)
-	@echo "Starting orc server + both AI models..."
-	go run ./cmd/train-orc -port=9876 &
+play-both:             ## Watch player AI vs orc AI battle with game UI
+	@echo "Starting game with player+orc AI on port 9876..."
+	@echo "Close game window to stop."
+	go run ./cmd/game -ai-both 9876 &
 	@sleep 2
 	cd ai && python3 play_both.py --player-model=$(or $(PLAYER_MODEL),checkpoints/ppo_final.zip) --orc-model=$(or $(ORC_MODEL),checkpoints/orc_final.zip) --port 9876
 

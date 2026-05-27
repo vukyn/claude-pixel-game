@@ -59,6 +59,7 @@ type Deps struct {
 	Layout        hud.Layout
 	TimeoutS      float64
 	AIPort        int
+	AIBothPort    int
 }
 
 type Game struct {
@@ -90,6 +91,7 @@ type Game struct {
 	aiConn            net.Conn
 	aiReader          *bufio.Reader
 	aiWriter          *bufio.Writer
+	aiBothMode        bool
 }
 
 type livesProvider struct{ p *player.Player }
@@ -195,13 +197,22 @@ func New(d Deps) *Game {
 	g.timeoutS = d.TimeoutS
 	g.toast = hud.NewToast(d.OverSubtitle, d.Cfg.WindowW)
 
-	if d.AIPort > 0 {
-		ln, err := net.Listen("tcp", fmt.Sprintf(":%d", d.AIPort))
+	aiPort := d.AIPort
+	if d.AIBothPort > 0 {
+		aiPort = d.AIBothPort
+		g.aiBothMode = true
+	}
+	if aiPort > 0 {
+		ln, err := net.Listen("tcp", fmt.Sprintf(":%d", aiPort))
 		if err != nil {
-			log.Fatalf("AI: listen on port %d: %v", d.AIPort, err)
+			log.Fatalf("AI: listen on port %d: %v", aiPort, err)
 		}
 		g.aiListener = ln
-		log.Printf("AI: listening on :%d — waiting for agent to connect...", d.AIPort)
+		mode := "player"
+		if g.aiBothMode {
+			mode = "player+orc"
+		}
+		log.Printf("AI (%s): listening on :%d — waiting for agent to connect...", mode, aiPort)
 		conn, err := ln.Accept()
 		if err != nil {
 			log.Fatalf("AI: accept: %v", err)
@@ -270,6 +281,22 @@ type aiObsMsg struct {
 type aiActionMsg struct {
 	Type   string `json:"type"`
 	Action int    `json:"action"`
+}
+
+type aiBothObsMsg struct {
+	Type       string         `json:"type"`
+	PlayerObs  []float64      `json:"player_obs"`
+	OrcObs     [][]float64    `json:"orc_obs"`
+	OrcRewards []float64      `json:"orc_rewards"`
+	OrcDones   []bool         `json:"orc_dones"`
+	Done       bool           `json:"done"`
+	Info       map[string]any `json:"info,omitempty"`
+}
+
+type aiBothActionMsg struct {
+	Type         string `json:"type"`
+	PlayerAction int    `json:"player_action"`
+	OrcActions   []int  `json:"orc_actions"`
 }
 
 func (g *Game) aiReadMsg() (string, int) {
@@ -375,6 +402,164 @@ func (g *Game) aiObserve() [aienv.ObsSize]float64 {
 	})
 }
 
+func (g *Game) aiBothReadMsg() (string, input.Intent, []int) {
+	line, err := g.aiReader.ReadBytes('\n')
+	if err != nil {
+		log.Printf("AI: read error: %v", err)
+		return "", input.Intent{}, nil
+	}
+	var msg aiBothActionMsg
+	if err := json.Unmarshal(line, &msg); err != nil {
+		log.Printf("AI: unmarshal error: %v", err)
+		return "", input.Intent{}, nil
+	}
+	return msg.Type, aienv.ToIntent(msg.PlayerAction), msg.OrcActions
+}
+
+func (g *Game) aiBothSendObs(done bool) {
+	playerObs := g.aiObserve()
+	orcObs := make([][]float64, 0, len(g.enemies))
+	orcRewards := make([]float64, len(g.enemies))
+	orcDones := make([]bool, len(g.enemies))
+	for i, e := range g.enemies {
+		obs := g.orcObserveEnemy(e)
+		orcObs = append(orcObs, obs[:])
+		orcDones[i] = e.Dead || e.CurrentState == "death"
+	}
+	msg := aiBothObsMsg{
+		Type: "obs", PlayerObs: playerObs[:],
+		OrcObs: orcObs, OrcRewards: orcRewards, OrcDones: orcDones,
+		Done: done,
+		Info: map[string]any{
+			"player_lives": g.player.Lives,
+			"orc_count":    len(g.enemies),
+			"elapsed":      g.elapsedS,
+		},
+	}
+	data, _ := json.Marshal(msg)
+	g.aiWriter.Write(data)
+	g.aiWriter.WriteByte('\n')
+	g.aiWriter.Flush()
+}
+
+func (g *Game) aiBothWaitReset() {
+	line, err := g.aiReader.ReadBytes('\n')
+	if err != nil {
+		log.Printf("AI: read error waiting for reset: %v", err)
+		return
+	}
+	var msg aiBothActionMsg
+	json.Unmarshal(line, &msg)
+	g.reset()
+	g.mode = ModePlaying
+	g.aiBothSendObs(false)
+}
+
+func (g *Game) applyOrcRLActions(orcActions []int, dt time.Duration) {
+	for i, e := range g.enemies {
+		if e.Dead || e.CurrentState == "death" || e.CurrentState == "hurt" || e.CurrentState == "fall" {
+			e.Tick(dt)
+			continue
+		}
+		if e.CurrentState == "attack" || e.CurrentState == "attack2" {
+			e.Tick(dt)
+			continue
+		}
+		action := 0
+		if i < len(orcActions) {
+			action = orcActions[i]
+		}
+		ar := aienv.OrcAction(action)
+		if ar.Transition != "" && e.CurrentState == "run" {
+			e.Transition(ar.Transition)
+			continue
+		}
+		if ar.Flip {
+			e.Facing = -e.Facing
+			e.VX = 0
+			continue
+		}
+		speed := 120.0
+		switch ar.VXMode {
+		case aienv.OrcVXStop:
+			e.VX = 0
+		case aienv.OrcVXToward:
+			if g.player.X > e.X {
+				e.Facing = 1
+			} else {
+				e.Facing = -1
+			}
+			e.VX = float64(e.Facing) * speed
+		case aienv.OrcVXAway:
+			if g.player.X > e.X {
+				e.Facing = -1
+			} else {
+				e.Facing = 1
+			}
+			e.VX = float64(e.Facing) * speed
+		}
+		if e.Current != nil {
+			e.Current.Update(dt)
+		}
+	}
+	for _, e := range g.enemies {
+		if e.Lives <= 0 && e.CurrentState != "death" {
+			e.Transition("death")
+		}
+		if e.OnHitPending {
+			e.OnHitPending = false
+			e.Transition("hurt")
+		}
+	}
+}
+
+func (g *Game) orcObserveEnemy(e *enemy.Enemy) [aienv.OrcObsSize]float64 {
+	orcStateIdx := 0
+	switch e.CurrentState {
+	case "run":
+		orcStateIdx = 1
+	case "attack":
+		orcStateIdx = 2
+	case "attack2":
+		orcStateIdx = 3
+	case "hurt":
+		orcStateIdx = 4
+	case "death":
+		orcStateIdx = 5
+	}
+	playerStateIdx := 0
+	switch g.player.FSM.CurrentID() {
+	case player.StateRun:
+		playerStateIdx = 1
+	case player.StateJump:
+		playerStateIdx = 2
+	case player.StateFall:
+		playerStateIdx = 3
+	case player.StateAttack:
+		playerStateIdx = 4
+	case player.StateAttack2:
+		playerStateIdx = 5
+	case player.StateHit:
+		playerStateIdx = 6
+	case player.StateDeath:
+		playerStateIdx = 7
+	}
+	playerAttacking := g.player.CurrentAnim == "soldier_attack" || g.player.CurrentAnim == "soldier_attack2"
+	return aienv.OrcObserve(aienv.OrcGameState{
+		OrcX: e.X, OrcY: e.Y, OrcVX: e.VX, OrcVY: e.VY,
+		OrcFacing: e.Facing, OrcGrounded: e.Grounded,
+		OrcLives: e.Lives, OrcMaxLives: int(e.Kind.Tuning.MaxLives),
+		OrcStateID: orcStateIdx, OrcNumStates: 6,
+		PlayerX: g.player.X, PlayerY: g.player.Y,
+		PlayerLives: g.player.Lives, PlayerMaxLives: g.combatTuning.SoldierMaxLives,
+		PlayerStateID: playerStateIdx, PlayerNumStates: 8,
+		PlayerAttacking: playerAttacking, PlayerFacing: g.player.Facing,
+		OrcMaxSpeed: 120, OrcMaxFall: g.player.Physics.MaxFallSpeed,
+		TimeoutS: g.timeoutS, ElapsedS: g.elapsedS,
+		WindowW: float64(g.cfg.WindowW), WindowH: float64(g.cfg.WindowH),
+	})
+}
+
 func (g *Game) Layout(outerW, outerH int) (int, int) { return g.cfg.WindowW, g.cfg.WindowH }
 
 func (g *Game) Update() error {
@@ -411,6 +596,10 @@ func (g *Game) Update() error {
 	}
 
 	if g.mode == ModeGameOver || g.mode == ModeTimeOut {
+		if g.aiConn != nil && g.aiBothMode {
+			g.aiBothWaitReset()
+			return nil
+		}
 		if g.aiConn != nil {
 			msgType, _ := g.aiReadMsg()
 			if msgType == "reset" {
@@ -435,7 +624,17 @@ func (g *Game) Update() error {
 	}
 
 	var intent input.Intent
-	if g.aiConn != nil {
+	var orcActions []int
+	if g.aiConn != nil && g.aiBothMode {
+		var msgType string
+		msgType, intent, orcActions = g.aiBothReadMsg()
+		if msgType == "reset" {
+			g.reset()
+			g.mode = ModePlaying
+			g.aiBothSendObs(false)
+			return nil
+		}
+	} else if g.aiConn != nil {
 		msgType, action := g.aiReadMsg()
 		if msgType == "reset" {
 			g.reset()
@@ -465,8 +664,12 @@ func (g *Game) Update() error {
 	}
 
 	g.player.FSM.Handle(g.player, g.lastIntent, dt)
-	for _, e := range g.enemies {
-		e.Tick(dt)
+	if g.aiBothMode && orcActions != nil {
+		g.applyOrcRLActions(orcActions, dt)
+	} else {
+		for _, e := range g.enemies {
+			e.Tick(dt)
+		}
 	}
 
 	g.player.ApplyPhysics(g.world, dt)
@@ -523,7 +726,10 @@ func (g *Game) Update() error {
 		g.mode = ModeGameOver
 	}
 
-	if g.aiConn != nil {
+	if g.aiConn != nil && g.aiBothMode {
+		done := g.mode == ModeGameOver || g.mode == ModeTimeOut
+		g.aiBothSendObs(done)
+	} else if g.aiConn != nil {
 		done := g.mode == ModeGameOver || g.mode == ModeTimeOut
 		reward := 0.0
 		if done {
