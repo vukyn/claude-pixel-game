@@ -79,8 +79,8 @@ INSERT INTO tuning (key, value, min_value, max_value, unit, description) VALUES
     ('slime_points',           15,    0,1000, '',    'points awarded when slime killed'),
 
     -- spawner (all kinds)
-    ('enemy_spawn_min_s',  3, 1, 60, 's', 'minimum enemy spawn interval (all kinds)'),
-    ('enemy_spawn_max_s', 10, 1, 60, 's', 'maximum enemy spawn interval (all kinds)'),
+    ('enemy_spawn_min_s',  1, 1, 60, 's', 'minimum enemy spawn interval (all kinds)'),
+    ('enemy_spawn_max_s',  3, 1, 60, 's', 'maximum enemy spawn interval (all kinds)'),
     ('enemy_max_alive',    3, 1, 10, '',  'max concurrent enemies (all kinds)'),
 
     -- game
