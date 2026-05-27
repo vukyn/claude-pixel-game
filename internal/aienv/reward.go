@@ -8,6 +8,7 @@ type RewardInput struct {
 	FinalScore        int
 	HitsLanded        int
 	AttackWhiffed     bool
+	JumpedNoReason    bool
 	DistDelta         float64
 }
 
@@ -38,7 +39,10 @@ func CalcRewardScaled(in RewardInput, shapedScale float64) float64 {
 		shaped += float64(in.HitsLanded) * 2.0
 	}
 	if in.AttackWhiffed {
-		shaped += -0.1
+		shaped += -0.5
+	}
+	if in.JumpedNoReason {
+		shaped += -0.3
 	}
 	if in.DistDelta < 0 {
 		shaped += 0.5

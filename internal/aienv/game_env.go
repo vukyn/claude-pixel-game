@@ -243,6 +243,11 @@ func (env *GameEnv) Step(action int) (obs []float64, reward float64, done bool, 
 		whiffed = true
 	}
 
+	jumpedNoReason := false
+	if intent.JumpPressed && currDist > 200 {
+		jumpedNoReason = true
+	}
+
 	reward = CalcRewardScaled(RewardInput{
 		EnemyKilledPoints: killedPoints,
 		LivesLost:         livesLost,
@@ -251,6 +256,7 @@ func (env *GameEnv) Step(action int) (obs []float64, reward float64, done bool, 
 		FinalScore:        env.sc.Total(),
 		HitsLanded:        soldierHits,
 		AttackWhiffed:     whiffed,
+		JumpedNoReason:    jumpedNoReason,
 		DistDelta:         distDelta,
 	}, env.shapedScale)
 
