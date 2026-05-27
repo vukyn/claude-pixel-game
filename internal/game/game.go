@@ -1,11 +1,14 @@
 package game
 
 import (
+	"bufio"
+	"encoding/json"
 	"fmt"
 	"image/color"
 	"log"
 	"math"
 	"math/rand"
+	"net"
 	"sort"
 	"time"
 
@@ -14,6 +17,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 
+	"claude-pixel/internal/aienv"
 	"claude-pixel/internal/anim"
 	"claude-pixel/internal/combat"
 	"claude-pixel/internal/config"
@@ -54,6 +58,7 @@ type Deps struct {
 	OverSubtitle  *text.GoTextFace
 	Layout        hud.Layout
 	TimeoutS      float64
+	AIPort        int
 }
 
 type Game struct {
@@ -81,6 +86,10 @@ type Game struct {
 	rng               *rand.Rand
 	score             *score.Counter
 	swallowNextIntent bool
+	aiListener        net.Listener
+	aiConn            net.Conn
+	aiReader          *bufio.Reader
+	aiWriter          *bufio.Writer
 }
 
 type livesProvider struct{ p *player.Player }
@@ -186,6 +195,23 @@ func New(d Deps) *Game {
 	g.timeoutS = d.TimeoutS
 	g.toast = hud.NewToast(d.OverSubtitle, d.Cfg.WindowW)
 
+	if d.AIPort > 0 {
+		ln, err := net.Listen("tcp", fmt.Sprintf(":%d", d.AIPort))
+		if err != nil {
+			log.Fatalf("AI: listen on port %d: %v", d.AIPort, err)
+		}
+		g.aiListener = ln
+		log.Printf("AI: listening on :%d — waiting for agent to connect...", d.AIPort)
+		conn, err := ln.Accept()
+		if err != nil {
+			log.Fatalf("AI: accept: %v", err)
+		}
+		g.aiConn = conn
+		g.aiReader = bufio.NewReader(conn)
+		g.aiWriter = bufio.NewWriter(conn)
+		log.Printf("AI: agent connected")
+	}
+
 	return g
 }
 
@@ -232,6 +258,142 @@ func (g *Game) nearestEnemy() *enemy.Enemy {
 	return best
 }
 
+// AI socket protocol messages (mirror cmd/train/protocol.go).
+type aiObsMsg struct {
+	Type   string                 `json:"type"`
+	Obs    []float64              `json:"obs"`
+	Reward float64                `json:"reward"`
+	Done   bool                   `json:"done"`
+	Info   map[string]interface{} `json:"info,omitempty"`
+}
+
+type aiActionMsg struct {
+	Type   string `json:"type"`
+	Action int    `json:"action"`
+}
+
+func (g *Game) aiPollAction() input.Intent {
+	obs := g.aiObserve()
+	msg := aiObsMsg{Type: "obs", Obs: obs[:], Reward: 0, Done: false}
+	data, _ := json.Marshal(msg)
+	g.aiWriter.Write(data)
+	g.aiWriter.WriteByte('\n')
+	g.aiWriter.Flush()
+
+	line, err := g.aiReader.ReadBytes('\n')
+	if err != nil {
+		log.Printf("AI: read error: %v", err)
+		return input.Intent{}
+	}
+	var action aiActionMsg
+	if err := json.Unmarshal(line, &action); err != nil {
+		log.Printf("AI: unmarshal error: %v", err)
+		return input.Intent{}
+	}
+	return aienv.ToIntent(action.Action)
+}
+
+func (g *Game) aiSendDone() {
+	obs := g.aiObserve()
+	msg := aiObsMsg{Type: "obs", Obs: obs[:], Reward: 0, Done: true, Info: map[string]interface{}{
+		"score":   g.score.Total(),
+		"lives":   g.player.Lives,
+		"elapsed": g.elapsedS,
+	}}
+	data, _ := json.Marshal(msg)
+	g.aiWriter.Write(data)
+	g.aiWriter.WriteByte('\n')
+	g.aiWriter.Flush()
+}
+
+func (g *Game) aiWaitReset() {
+	line, err := g.aiReader.ReadBytes('\n')
+	if err != nil {
+		log.Printf("AI: read error waiting for reset: %v", err)
+		return
+	}
+	var msg aiActionMsg
+	json.Unmarshal(line, &msg)
+	g.reset()
+	g.mode = ModePlaying
+}
+
+func (g *Game) aiObserve() [aienv.ObsSize]float64 {
+	enemies := make([]aienv.EnemyState, 0, len(g.enemies))
+	for _, e := range g.enemies {
+		stateIdx := 0
+		attacking := false
+		switch e.CurrentState {
+		case "run":
+			stateIdx = 1
+		case "attack":
+			stateIdx = 2
+			attacking = true
+		case "attack2":
+			stateIdx = 3
+			attacking = true
+		case "hurt":
+			stateIdx = 4
+		case "death":
+			stateIdx = 5
+		}
+		enemies = append(enemies, aienv.EnemyState{
+			RelX:      e.X - g.player.X,
+			RelY:      e.Y - g.player.Y,
+			Lives:     e.Lives,
+			MaxLives:  int(e.Kind.Tuning.MaxLives),
+			State:     stateIdx,
+			Attacking: attacking,
+		})
+	}
+
+	stateIdx := 0
+	switch g.player.FSM.CurrentID() {
+	case player.StateRun:
+		stateIdx = 1
+	case player.StateJump:
+		stateIdx = 2
+	case player.StateFall:
+		stateIdx = 3
+	case player.StateAttack:
+		stateIdx = 4
+	case player.StateAttack2:
+		stateIdx = 5
+	case player.StateHit:
+		stateIdx = 6
+	case player.StateDeath:
+		stateIdx = 7
+	}
+
+	staminaFrac := 0.0
+	if g.player.Stamina != nil {
+		staminaFrac = g.player.Stamina.Fraction()
+	}
+
+	return aienv.Observe(aienv.GameState{
+		PlayerX:   g.player.X,
+		PlayerY:   g.player.Y,
+		PlayerVX:  g.player.VX,
+		PlayerVY:  g.player.VY,
+		Facing:    g.player.Facing,
+		Grounded:  g.player.Grounded,
+		Lives:     g.player.Lives,
+		MaxLives:  g.combatTuning.SoldierMaxLives,
+		Stamina:   staminaFrac,
+		StateID:   stateIdx,
+		NumStates: 8,
+		TimeoutS:  g.timeoutS,
+		ElapsedS:  g.elapsedS,
+		Enemies:   enemies,
+		MaxAlive:  g.spawner.MaxAlive,
+		Score:     g.score.Total(),
+		MaxSpeed:  g.player.Physics.SprintSpeed,
+		MaxFall:   g.player.Physics.MaxFallSpeed,
+		WindowW:   float64(g.cfg.WindowW),
+		WindowH:   float64(g.cfg.WindowH),
+	})
+}
+
 func (g *Game) Layout(outerW, outerH int) (int, int) { return g.cfg.WindowW, g.cfg.WindowH }
 
 func (g *Game) Update() error {
@@ -268,6 +430,11 @@ func (g *Game) Update() error {
 	}
 
 	if g.mode == ModeGameOver || g.mode == ModeTimeOut {
+		if g.aiConn != nil {
+			g.aiSendDone()
+			g.aiWaitReset()
+			return nil
+		}
 		if inpututil.IsKeyJustPressed(ebiten.KeyR) {
 			g.reset()
 		}
@@ -282,7 +449,12 @@ func (g *Game) Update() error {
 		return nil
 	}
 
-	intent := input.Poll()
+	var intent input.Intent
+	if g.aiConn != nil {
+		intent = g.aiPollAction()
+	} else {
+		intent = input.Poll()
+	}
 	if intent.PauseEdge {
 		g.mode = ModePaused
 		return nil

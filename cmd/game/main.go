@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"log"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -18,6 +19,9 @@ import (
 )
 
 func main() {
+	aiPort := flag.Int("ai", 0, "AI control port (0 = keyboard)")
+	flag.Parse()
+
 	cfg := config.Load()
 
 	db := storage.MustOpen(cfg)
@@ -141,6 +145,7 @@ func main() {
 		OverSubtitle:  hud.NewFace(32),
 		Layout:        layout,
 		TimeoutS:      timeoutS,
+		AIPort:        *aiPort,
 	})
 
 	ebiten.SetWindowSize(cfg.WindowW, cfg.WindowH)
