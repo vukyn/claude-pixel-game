@@ -23,6 +23,10 @@ type ScoreProvider interface {
 	Score() int
 }
 
+type TimerProvider interface {
+	RemainingS() float64
+}
+
 type HUD struct {
 	Heart      *anim.Animation
 	StaminaBar *anim.Animation
@@ -30,6 +34,7 @@ type HUD struct {
 	Lives      LivesProvider
 	Stamina    StaminaProvider
 	Score      ScoreProvider
+	Timer      TimerProvider
 	Layout     Layout
 	WindowW    int
 	WindowH    int
@@ -42,12 +47,13 @@ func NewHUD(
 	lives LivesProvider,
 	stamina StaminaProvider,
 	score ScoreProvider,
+	timer TimerProvider,
 	layout Layout,
 	windowW, windowH int,
 ) *HUD {
 	return &HUD{
 		Heart: heart, StaminaBar: staminaBar, Face: face,
-		Lives: lives, Stamina: stamina, Score: score,
+		Lives: lives, Stamina: stamina, Score: score, Timer: timer,
 		Layout: layout, WindowW: windowW, WindowH: windowH,
 	}
 }
@@ -67,11 +73,20 @@ func formatLives(n int) string {
 
 func formatScore(n int) string { return fmt.Sprintf("Score: %d", n) }
 
+func formatTimer(remaining float64) string {
+	if remaining < 0 {
+		remaining = 0
+	}
+	s := int(remaining)
+	return fmt.Sprintf("%d:%02d", s/60, s%60)
+}
+
 func (h *HUD) Draw(screen *ebiten.Image) {
 	h.drawHeart(screen)
 	h.drawLives(screen)
 	h.drawScore(screen)
 	h.drawStamina(screen)
+	h.drawTimer(screen)
 }
 
 func (h *HUD) drawHeart(screen *ebiten.Image) {
@@ -123,6 +138,21 @@ func (h *HUD) drawScore(screen *ebiten.Image) {
 		return
 	}
 	h.drawTextElement(screen, "score_text", formatScore(h.Score.Score()))
+}
+
+func (h *HUD) drawTimer(screen *ebiten.Image) {
+	if h.Timer == nil || h.Face == nil {
+		return
+	}
+	label := formatTimer(h.Timer.RemainingS())
+	tw, _ := text.Measure(label, h.Face, 0)
+	e := h.Layout["timer_text"]
+	x := float64(h.WindowW)/2 - tw/2
+	y := float64(e.Y)
+	op := &text.DrawOptions{}
+	op.GeoM.Translate(x, y)
+	op.ColorScale.ScaleWithColor(color.RGBA{0xFF, 0xFF, 0xFF, 0xFF})
+	text.Draw(screen, label, h.Face, op)
 }
 
 func (h *HUD) drawStamina(screen *ebiten.Image) {

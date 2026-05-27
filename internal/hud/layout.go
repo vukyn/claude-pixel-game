@@ -104,7 +104,7 @@ func (LayoutMapper) Values(r LayoutRow) []any {
 	return []any{r.Key, r.X, r.Y, r.W, r.H, r.AnchorS, r.Scale}
 }
 
-var requiredLayoutKeys = []string{"heart", "lives_text", "score_text", "stamina_bar"}
+var requiredLayoutKeys = []string{"heart", "lives_text", "score_text", "stamina_bar", "timer_text"}
 
 // LoadLayout reads every hud_layout row, parses anchors, requires all
 // required keys to be present.

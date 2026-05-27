@@ -34,6 +34,7 @@ const (
 	ModePlaying Mode = iota
 	ModePaused
 	ModeGameOver
+	ModeTimeOut
 )
 
 type Deps struct {
@@ -52,6 +53,7 @@ type Deps struct {
 	OverTitle     *text.GoTextFace
 	OverSubtitle  *text.GoTextFace
 	Layout        hud.Layout
+	TimeoutS      float64
 }
 
 type Game struct {
@@ -69,6 +71,9 @@ type Game struct {
 	hitboxDebug       bool
 	lastIntent        input.Intent
 	combatTuning      *combat.Tuning
+	timeout           *hud.TimeOut
+	timeoutS          float64
+	elapsedS          float64
 	kinds             []*enemy.Kind
 	anims             map[string]*anim.Animation
 	physics           *player.Physics
@@ -89,6 +94,16 @@ func (s staminaProvider) StaminaFraction() float64 { return s.pool.Fraction() }
 type scoreProvider struct{ c *score.Counter }
 
 func (s scoreProvider) Score() int { return s.c.Total() }
+
+type timerProvider struct{ g *Game }
+
+func (t timerProvider) RemainingS() float64 {
+	r := t.g.timeoutS - t.g.elapsedS
+	if r < 0 {
+		return 0
+	}
+	return r
+}
 
 func New(d Deps) *Game {
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -162,10 +177,13 @@ func New(d Deps) *Game {
 	g.hud = hud.NewHUD(
 		d.HeartAnim, d.StaminaAnim, d.HUDFace,
 		livesProvider{p}, staminaProvider{pool}, scoreProvider{sc},
+		timerProvider{g},
 		d.Layout, d.Cfg.WindowW, d.Cfg.WindowH,
 	)
 	g.gameOver = hud.NewGameOver(d.OverTitle, d.OverSubtitle, d.Cfg.WindowW, d.Cfg.WindowH)
 	g.pause = hud.NewPause(d.OverTitle, d.OverSubtitle, d.Cfg.WindowW, d.Cfg.WindowH)
+	g.timeout = hud.NewTimeOut(d.OverTitle, d.OverSubtitle, d.Cfg.WindowW, d.Cfg.WindowH)
+	g.timeoutS = d.TimeoutS
 	g.toast = hud.NewToast(d.OverSubtitle, d.Cfg.WindowW)
 
 	return g
@@ -249,7 +267,7 @@ func (g *Game) Update() error {
 		}
 	}
 
-	if g.mode == ModeGameOver {
+	if g.mode == ModeGameOver || g.mode == ModeTimeOut {
 		if inpututil.IsKeyJustPressed(ebiten.KeyR) {
 			g.reset()
 		}
@@ -333,6 +351,11 @@ func (g *Game) Update() error {
 	}
 	g.enemies = alive
 
+	g.elapsedS += dt.Seconds()
+	if g.timeoutS > 0 && g.elapsedS >= g.timeoutS {
+		g.mode = ModeTimeOut
+	}
+
 	if g.player.FSM.CurrentID() == player.StateDeath && g.player.Current != nil && g.player.Current.Done() {
 		g.mode = ModeGameOver
 	}
@@ -383,6 +406,7 @@ func (g *Game) reset() {
 	g.player.Grounded = true
 
 	g.score.Reset()
+	g.elapsedS = 0
 
 	g.hud.Lives = livesProvider{g.player}
 	g.hud.Stamina = staminaProvider{pool}
@@ -419,6 +443,9 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 	if g.mode == ModeGameOver {
 		g.gameOver.Draw(screen)
+	}
+	if g.mode == ModeTimeOut {
+		g.timeout.Draw(screen, g.score.Total())
 	}
 
 	g.toast.Draw(screen)

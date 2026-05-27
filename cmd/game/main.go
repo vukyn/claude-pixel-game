@@ -122,6 +122,8 @@ func main() {
 			[]string{orcKind.Name, slimeKind.Name}, dbgCfg.SpawnEnemies)
 	}
 
+	timeoutS := tuneMap["game_timeout_s"]
+
 	g := game.New(game.Deps{
 		Cfg:           cfg,
 		Anims:         anims,
@@ -138,6 +140,7 @@ func main() {
 		OverTitle:     hud.NewFace(96),
 		OverSubtitle:  hud.NewFace(32),
 		Layout:        layout,
+		TimeoutS:      timeoutS,
 	})
 
 	ebiten.SetWindowSize(cfg.WindowW, cfg.WindowH)
