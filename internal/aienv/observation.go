@@ -2,7 +2,7 @@ package aienv
 
 import "math"
 
-const ObsSize = 25
+const ObsSize = 31
 
 type EnemyState struct {
 	RelX      float64
@@ -58,7 +58,7 @@ func Observe(gs GameState) [ObsSize]float64 {
 	obs[9] = clamp01(remaining / safeDivisor(gs.TimeoutS))
 
 	sorted := sortByDistance(gs.Enemies)
-	for i := 0; i < 3; i++ {
+	for i := 0; i < 5; i++ {
 		base := 10 + i*3
 		if i < len(sorted) {
 			e := sorted[i]
@@ -68,20 +68,20 @@ func Observe(gs GameState) [ObsSize]float64 {
 		}
 	}
 
-	obs[19] = clamp01(float64(len(gs.Enemies)) / safeDivisor(float64(gs.MaxAlive)))
+	obs[25] = clamp01(float64(len(gs.Enemies)) / safeDivisor(float64(gs.MaxAlive)))
 
 	maxScore := 1000.0
-	obs[20] = clamp01(float64(gs.Score) / maxScore)
+	obs[26] = clamp01(float64(gs.Score) / maxScore)
 
 	if len(sorted) > 0 {
 		nearest := sorted[0]
 		diag := math.Sqrt(gs.WindowW*gs.WindowW + gs.WindowH*gs.WindowH)
 		dist := math.Sqrt(nearest.RelX*nearest.RelX + nearest.RelY*nearest.RelY)
-		obs[21] = clamp01(dist / diag)
-		obs[22] = clamp01((math.Atan2(nearest.RelY, nearest.RelX)/math.Pi + 1) / 2)
-		obs[23] = clamp01(float64(nearest.State) / 6.0)
+		obs[27] = clamp01(dist / diag)
+		obs[28] = clamp01((math.Atan2(nearest.RelY, nearest.RelX)/math.Pi + 1) / 2)
+		obs[29] = clamp01(float64(nearest.State) / 6.0)
 		if nearest.Attacking {
-			obs[24] = 1
+			obs[30] = 1
 		}
 	}
 

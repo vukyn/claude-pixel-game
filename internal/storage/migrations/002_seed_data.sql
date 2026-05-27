@@ -81,7 +81,7 @@ INSERT INTO tuning (key, value, min_value, max_value, unit, description) VALUES
     -- spawner (all kinds)
     ('enemy_spawn_min_s',  1, 1, 60, 's', 'minimum enemy spawn interval (all kinds)'),
     ('enemy_spawn_max_s',  3, 1, 60, 's', 'maximum enemy spawn interval (all kinds)'),
-    ('enemy_max_alive',    3, 1, 10, '',  'max concurrent enemies (all kinds)'),
+    ('enemy_max_alive',    5, 1, 10, '',  'max concurrent enemies (all kinds)'),
 
     -- game
     ('game_timeout_s', 30, 5, 300, 's', 'game duration before time-up screen');

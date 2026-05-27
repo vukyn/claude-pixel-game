@@ -1,6 +1,6 @@
 # ai/config.py
 
-OBS_SIZE = 25
+OBS_SIZE = 31
 NUM_ACTIONS = 10
 
 PPO_PARAMS = dict(

@@ -6,8 +6,8 @@ import (
 )
 
 func TestObsSize(t *testing.T) {
-	if ObsSize != 25 {
-		t.Fatalf("ObsSize = %d, want 25", ObsSize)
+	if ObsSize != 31 {
+		t.Fatalf("ObsSize = %d, want 31", ObsSize)
 	}
 }
 
@@ -47,15 +47,15 @@ func TestObserve_Grounded(t *testing.T) {
 }
 
 func TestObserve_NoEnemies(t *testing.T) {
-	gs := GameState{WindowW: 1280, WindowH: 720, MaxAlive: 3}
+	gs := GameState{WindowW: 1280, WindowH: 720, MaxAlive: 5}
 	obs := Observe(gs)
-	for i := 10; i <= 18; i++ {
+	for i := 10; i <= 24; i++ {
 		if obs[i] != 0.0 {
 			t.Errorf("obs[%d] = %f, want 0.0 (no enemies)", i, obs[i])
 		}
 	}
-	if obs[19] != 0.0 {
-		t.Errorf("num_enemies = %f, want 0.0", obs[19])
+	if obs[25] != 0.0 {
+		t.Errorf("num_enemies = %f, want 0.0", obs[25])
 	}
 }
 
@@ -73,8 +73,8 @@ func TestObserve_WithEnemy(t *testing.T) {
 	if obs[10] < 0.07 || obs[10] > 0.09 {
 		t.Errorf("enemy1 rel_x = %f, want ~0.078", obs[10])
 	}
-	if math.Abs(obs[19]-1.0/3.0) > 0.01 {
-		t.Errorf("num_enemies = %f, want ~0.333", obs[19])
+	if math.Abs(obs[25]-1.0/5.0) > 0.01 {
+		t.Errorf("num_enemies = %f, want ~0.2", obs[25])
 	}
 	if math.Abs(obs[9]-0.5) > 0.01 {
 		t.Errorf("time_remaining = %f, want 0.5", obs[9])
