@@ -40,12 +40,13 @@ type GameEnv struct {
 	timeoutS     float64
 	elapsedS     float64
 	rng          *rand.Rand
-	prevScore    int
-	prevLives    int
-	prevDist     float64
-	anims        map[string]*anim.Animation
-	soldierBoxes map[string]combat.Box
-	shapedScale  float64
+	prevScore         int
+	prevLives         int
+	prevDist          float64
+	stepsSinceScore   int
+	anims             map[string]*anim.Animation
+	soldierBoxes      map[string]combat.Box
+	shapedScale       float64
 }
 
 func NewGameEnv(ecfg EnvConfig) (*GameEnv, error) {
@@ -156,6 +157,7 @@ func (env *GameEnv) Reset() []float64 {
 	env.prevScore = 0
 	env.prevLives = env.combatTuning.SoldierMaxLives
 	env.prevDist = 0
+	env.stepsSinceScore = 0
 
 	env.sp = spawner.New(spawner.Config{
 		MinIntervalS: env.spawnTuning.MinS,
@@ -248,6 +250,13 @@ func (env *GameEnv) Step(action int) (obs []float64, reward float64, done bool, 
 		jumpedNoReason = true
 	}
 
+	if killedPoints > 0 {
+		env.stepsSinceScore = 0
+	} else {
+		env.stepsSinceScore++
+	}
+	stagnant := env.stepsSinceScore > 180
+
 	reward = CalcRewardScaled(RewardInput{
 		EnemyKilledPoints: killedPoints,
 		LivesLost:         livesLost,
@@ -257,6 +266,7 @@ func (env *GameEnv) Step(action int) (obs []float64, reward float64, done bool, 
 		HitsLanded:        soldierHits,
 		AttackWhiffed:     whiffed,
 		JumpedNoReason:    jumpedNoReason,
+		Stagnant:          stagnant,
 		DistDelta:         distDelta,
 	}, env.shapedScale)
 
