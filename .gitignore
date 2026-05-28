@@ -29,6 +29,9 @@ venv/
 /tune
 /game
 /editor
+/note
+/train
+/train-orc
 
 # AI training artifacts
 ai/checkpoints/
