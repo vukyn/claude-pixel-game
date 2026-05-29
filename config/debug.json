@@ -1,5 +1,5 @@
 {
-  "spawn_enemies": ["all"],
+  "spawn_enemies": ["orc"],
   "sections": [
     { "title": "State",      "fields": ["state", "facing", "grounded"] },
     { "title": "Kinematics", "fields": ["x", "y", "vx", "vy"] },

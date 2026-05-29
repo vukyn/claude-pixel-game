@@ -76,14 +76,14 @@ func handleOrcConn(conn net.Conn) {
 		case "reset":
 			result := env.Reset()
 			resp = OrcObsMsg{
-				Type: "obs", PlayerObs: result.PlayerObs,
+				Type: "obs", PlayerObs: result.PlayerObs, PlayerReward: result.PlayerReward,
 				OrcObs: result.OrcObs, OrcRewards: result.OrcRewards,
 				OrcDones: result.OrcDones, Done: result.Done, Info: result.Info,
 			}
 		case "action":
 			result := env.Step(msg.PlayerAction, msg.OrcActions)
 			resp = OrcObsMsg{
-				Type: "obs", PlayerObs: result.PlayerObs,
+				Type: "obs", PlayerObs: result.PlayerObs, PlayerReward: result.PlayerReward,
 				OrcObs: result.OrcObs, OrcRewards: result.OrcRewards,
 				OrcDones: result.OrcDones, Done: result.Done, Info: result.Info,
 			}

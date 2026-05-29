@@ -65,7 +65,7 @@ INSERT INTO tuning (key, value, min_value, max_value, unit, description) VALUES
     ('soldier_foot_padding',    0,    0,  80, 'px',   'transparent px at soldier sprite frame bottom (pre-render scale)'),
 
     -- orc
-    ('orc_max_lives',          2,    1,  10, '',     'starting orc lives'),
+    ('orc_max_lives',          5,    1,  10, '',     'starting orc lives'),
     ('orc_hurt_bounce_vx',   120,    0, 500, 'px/s', 'horizontal bounce away from attacker when orc is hurt'),
     ('orc_hurt_bounce_vy',  -180, -500,   0, 'px/s', 'vertical pop applied on orc hurt'),
     ('orc_foot_padding',      43,    0, 100, 'px',   'transparent px at orc sprite frame bottom (pre-render scale)'),

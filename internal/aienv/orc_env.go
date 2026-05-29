@@ -24,18 +24,23 @@ type OrcEnvConfig struct {
 }
 
 type OrcStepResult struct {
-	PlayerObs  []float64
-	OrcObs     [][]float64
-	OrcRewards []float64
-	OrcDones   []bool
-	Done       bool
-	Info       map[string]any
+	PlayerObs    []float64
+	PlayerReward float64
+	OrcObs       [][]float64
+	OrcRewards   []float64
+	OrcDones     []bool
+	Done         bool
+	Info         map[string]any
 }
 
 type orcPrevState struct {
-	lives int
-	dist  float64
+	lives        int
+	dist         float64
+	inSwing      bool
+	swingHadHit  bool
 }
+
+const orcDodgeProximityPx = 100.0
 
 type OrcTrainEnv struct {
 	cfg             *config.Config
@@ -54,9 +59,12 @@ type OrcTrainEnv struct {
 	rng             *rand.Rand
 	anims           map[string]*anim.Animation
 	soldierBoxes    map[string]combat.Box
-	prevPlayerLives int
-	prevOrcStates   map[*enemy.Enemy]*orcPrevState
-	stepsSinceHit   int
+	prevPlayerLives  int
+	prevPlayerScore  int
+	prevPlayerDist   float64
+	stepsSinceScore  int
+	prevOrcStates    map[*enemy.Enemy]*orcPrevState
+	stepsSinceHit    int
 }
 
 func NewOrcTrainEnv(ecfg OrcEnvConfig) (*OrcTrainEnv, error) {
@@ -151,6 +159,9 @@ func (env *OrcTrainEnv) Reset() OrcStepResult {
 	env.sc = &score.Counter{}
 	env.elapsedS = 0
 	env.prevPlayerLives = env.combatTuning.SoldierMaxLives
+	env.prevPlayerScore = 0
+	env.prevPlayerDist = 0
+	env.stepsSinceScore = 0
 	env.stepsSinceHit = 0
 
 	env.enemies = nil
@@ -193,7 +204,7 @@ func (env *OrcTrainEnv) Reset() OrcStepResult {
 		dist:  math.Abs(firstOrc.X - env.p.X),
 	}
 
-	return env.buildResult(nil, nil)
+	return env.buildResult(0, nil, nil)
 }
 
 func (env *OrcTrainEnv) Step(playerAction int, orcActions []int) OrcStepResult {
@@ -260,7 +271,7 @@ func (env *OrcTrainEnv) Step(playerAction int, orcActions []int) OrcStepResult {
 	}
 
 	orcHitsOnPlayer := env.dispatchOrcHits()
-	env.dispatchPlayerHits()
+	soldierHits := env.dispatchPlayerHits()
 
 	playerAttacking := env.p.CurrentAnim == "soldier_attack" || env.p.CurrentAnim == "soldier_attack2"
 	orcRewards := make([]float64, len(env.enemies))
@@ -283,7 +294,23 @@ func (env *OrcTrainEnv) Step(playerAction int, orcActions []int) OrcStepResult {
 			}
 		}
 
-		dodged := playerAttacking && distDelta > 0 && livesLost == 0
+		nowAttacking := e.CurrentState == "attack" || e.CurrentState == "attack2"
+		whiffed := false
+		if nowAttacking {
+			if !prev.inSwing {
+				prev.inSwing = true
+				prev.swingHadHit = false
+			}
+			if hitsLanded > 0 {
+				prev.swingHadHit = true
+			}
+		} else if prev.inSwing {
+			whiffed = !prev.swingHadHit
+			prev.inSwing = false
+			prev.swingHadHit = false
+		}
+
+		dodged := playerAttacking && distDelta > 0 && livesLost == 0 && currDist < orcDodgeProximityPx
 
 		if hitsLanded > 0 {
 			env.stepsSinceHit = 0
@@ -294,13 +321,14 @@ func (env *OrcTrainEnv) Step(playerAction int, orcActions []int) OrcStepResult {
 		playerDied := env.p.FSM.CurrentID() == player.StateDeath
 
 		orcRewards[i] = OrcCalcReward(OrcRewardInput{
-			HitPlayer:    hitsLanded,
-			PlayerDied:   playerDied,
-			OrcLivesLost: livesLost,
-			OrcDied:      e.Dead || e.CurrentState == "death",
-			DodgeSuccess: dodged,
-			Stagnant:     env.stepsSinceHit > 180,
-			DistDelta:    distDelta,
+			HitPlayer:     hitsLanded,
+			PlayerDied:    playerDied,
+			OrcLivesLost:  livesLost,
+			OrcDied:       e.Dead || e.CurrentState == "death",
+			DodgeSuccess:  dodged,
+			AttackWhiffed: whiffed,
+			Stagnant:      env.stepsSinceHit > 180,
+			DistDelta:     distDelta,
 		})
 
 		orcDones[i] = e.Dead || e.CurrentState == "death"
@@ -311,6 +339,7 @@ func (env *OrcTrainEnv) Step(playerAction int, orcActions []int) OrcStepResult {
 	alive := env.enemies[:0]
 	for _, e := range env.enemies {
 		if e.Dead {
+			env.sc.Add(e.Kind.Tuning.Points)
 			delete(env.prevOrcStates, e)
 			continue
 		}
@@ -319,9 +348,57 @@ func (env *OrcTrainEnv) Step(playerAction int, orcActions []int) OrcStepResult {
 	env.enemies = alive
 
 	env.elapsedS += dt.Seconds()
-	env.prevPlayerLives = env.p.Lives
 
-	return env.buildResult(orcRewards, orcDones)
+	died := env.p.FSM.CurrentID() == player.StateDeath
+	timedOut := env.timeoutS > 0 && env.elapsedS >= env.timeoutS
+
+	livesLost := env.prevPlayerLives - env.p.Lives
+	killedPoints := env.sc.Total() - env.prevPlayerScore
+	currDist := env.nearestOrcDist()
+	distDelta := currDist - env.prevPlayerDist
+
+	whiffedPlayer := playerAttacking && soldierHits == 0
+	jumpedNoReason := intent.JumpPressed && currDist > 200
+
+	if killedPoints > 0 {
+		env.stepsSinceScore = 0
+	} else {
+		env.stepsSinceScore++
+	}
+	stagnantPlayer := env.stepsSinceScore > 180
+
+	playerReward := CalcRewardScaled(RewardInput{
+		EnemyKilledPoints: killedPoints,
+		LivesLost:         livesLost,
+		Died:              died,
+		TimedOut:          timedOut,
+		FinalScore:        env.sc.Total(),
+		HitsLanded:        soldierHits,
+		AttackWhiffed:     whiffedPlayer,
+		JumpedNoReason:    jumpedNoReason,
+		Stagnant:          stagnantPlayer,
+		DistDelta:         distDelta,
+	}, 1.0)
+
+	env.prevPlayerScore = env.sc.Total()
+	env.prevPlayerLives = env.p.Lives
+	env.prevPlayerDist = currDist
+
+	return env.buildResult(playerReward, orcRewards, orcDones)
+}
+
+func (env *OrcTrainEnv) nearestOrcDist() float64 {
+	if len(env.enemies) == 0 {
+		return 0
+	}
+	best := math.MaxFloat64
+	for _, e := range env.enemies {
+		d := math.Abs(e.X - env.p.X)
+		if d < best {
+			best = d
+		}
+	}
+	return best
 }
 
 func (env *OrcTrainEnv) applyOrcAction(e *enemy.Enemy, action int) {
@@ -389,7 +466,7 @@ func (env *OrcTrainEnv) dispatchPlayerHits() int {
 	return len(hits)
 }
 
-func (env *OrcTrainEnv) buildResult(orcRewards []float64, orcDones []bool) OrcStepResult {
+func (env *OrcTrainEnv) buildResult(playerReward float64, orcRewards []float64, orcDones []bool) OrcStepResult {
 	playerObs := env.playerObserve()
 
 	orcObs := make([][]float64, len(env.enemies))
@@ -409,13 +486,15 @@ func (env *OrcTrainEnv) buildResult(orcRewards []float64, orcDones []bool) OrcSt
 	timedOut := env.timeoutS > 0 && env.elapsedS >= env.timeoutS
 
 	return OrcStepResult{
-		PlayerObs:  playerObs[:],
-		OrcObs:     orcObs,
-		OrcRewards: orcRewards,
-		OrcDones:   orcDones,
-		Done:       playerDied || timedOut,
+		PlayerObs:    playerObs[:],
+		PlayerReward: playerReward,
+		OrcObs:       orcObs,
+		OrcRewards:   orcRewards,
+		OrcDones:     orcDones,
+		Done:         playerDied || timedOut,
 		Info: map[string]any{
 			"player_lives": env.p.Lives,
+			"player_score": env.sc.Total(),
 			"orc_count":    len(env.enemies),
 			"elapsed":      env.elapsedS,
 		},

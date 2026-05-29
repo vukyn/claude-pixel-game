@@ -63,7 +63,7 @@ func TestObserve_WithEnemy(t *testing.T) {
 	gs := GameState{
 		PlayerX: 640, PlayerY: 600,
 		WindowW: 1280, WindowH: 720,
-		MaxAlive: 3, MaxLives: 10,
+		MaxAlive: 5, MaxLives: 10,
 		TimeoutS: 30, ElapsedS: 15,
 		Enemies: []EnemyState{
 			{RelX: 100, RelY: 0, Lives: 2, MaxLives: 2, State: 1, Attacking: false},

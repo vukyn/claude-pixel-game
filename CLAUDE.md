@@ -88,7 +88,7 @@ Combat + enemy (17):
 | `soldier_knockback_vx` | px/s | Horizontal bounce when hit |
 | `soldier_knockback_vy` | px/s | Upward pop when hit (airborne i-frame) |
 | `soldier_foot_padding` | px | Transparent px at soldier sprite frame bottom |
-| `orc_max_lives` | — | Starting orc lives (default 2) |
+| `orc_max_lives` | — | Starting orc lives (default 5) |
 | `orc_hurt_bounce_vx` | px/s | Horizontal bounce on hurt |
 | `orc_hurt_bounce_vy` | px/s | Upward pop on hurt |
 | `orc_foot_padding` | px | Transparent px at orc sprite frame bottom |
@@ -203,7 +203,7 @@ Shift alone = no-op. No double-jump. Attacks cancelable by Jump only (grounded).
 
 **Soldier** (8 states): `Idle`, `Run`, `Jump`, `Fall`, `Attack`, `Attack2`, `Hit`, `Death`. `Hit` = bounced back + airborne i-frame until grounded. `Death` = 10 lives consumed, terminal. Sprint gated by stamina — depletes sprinting, regens otherwise.
 
-**Orc** (6 states): `Fall` (from spawn), `Run`, `Attack`, `Attack2`, `Hurt`, `Death`. State list + decision tree (what to do while running) from `assets/behaviors/orc.json`. Run state reroll every 2 s: 50% attack (50/50 attack1/attack2), 50% flip/stop (50/50). 2 lives — second hit kills. Hurt anim = i-frame window.
+**Orc** (6 states): `Fall` (from spawn), `Run`, `Attack`, `Attack2`, `Hurt`, `Death`. State list + decision tree (what to do while running) from `assets/behaviors/orc.json`. Run state reroll every 2 s: 50% attack (50/50 attack1/attack2), 50% flip/stop (50/50). 5 lives — dies on 5th hit. Hurt anim = i-frame window.
 
 **Slime** (6 states): identical FSM shape to orc, `assets/behaviors/slime.json`. Run speed 60 (vs orc 80). Attack2 applies backward VX=-60 slide on frames 3–5 via per-state `on_frame_vx` in JSON.
 

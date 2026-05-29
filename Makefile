@@ -65,7 +65,7 @@ train-clean:           ## Remove all checkpoints and training logs
 
 # === Orc AI Training ===
 
-.PHONY: train-orc-server train-orc play-both train-orc-visual
+.PHONY: train-orc-server train-orc play-both train-orc-visual train-player-vs-orc
 
 train-orc-server:      ## Start headless server for orc RL training
 	go run ./cmd/train-orc -port=9876
@@ -85,3 +85,6 @@ train-orc-visual:      ## Train orc with game window visible (STEPS=50000 defaul
 	go run ./cmd/game -ai-orc 9876 &
 	@sleep 2
 	cd ai && python3 train_orc.py --timesteps=$(or $(STEPS),50000) --player-model=$(or $(PLAYER_MODEL),checkpoints/ppo_final.zip)
+
+train-player-vs-orc:   ## Train player RL vs frozen orc model (STEPS=500000 default, ORC_MODEL=checkpoints/orc_final.zip)
+	cd ai && python3 train_player_vs_orc.py --timesteps=$(or $(STEPS),500000) --orc-model=$(or $(ORC_MODEL),checkpoints/orc_final.zip)

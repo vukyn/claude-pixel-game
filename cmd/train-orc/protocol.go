@@ -8,13 +8,14 @@ import (
 )
 
 type OrcObsMsg struct {
-	Type       string         `json:"type"`
-	PlayerObs  []float64      `json:"player_obs"`
-	OrcObs     [][]float64    `json:"orc_obs"`
-	OrcRewards []float64      `json:"orc_rewards"`
-	OrcDones   []bool         `json:"orc_dones"`
-	Done       bool           `json:"done"`
-	Info       map[string]any `json:"info,omitempty"`
+	Type         string         `json:"type"`
+	PlayerObs    []float64      `json:"player_obs"`
+	PlayerReward float64        `json:"player_reward"`
+	OrcObs       [][]float64    `json:"orc_obs"`
+	OrcRewards   []float64      `json:"orc_rewards"`
+	OrcDones     []bool         `json:"orc_dones"`
+	Done         bool           `json:"done"`
+	Info         map[string]any `json:"info,omitempty"`
 }
 
 type OrcClientMsg struct {
